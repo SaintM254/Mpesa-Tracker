@@ -1,0 +1,17 @@
+{
+  "name": "mpesa-tracker",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Android app that tracks M-PESA transactions from SMS",
+  "scripts": {
+    "sync": "cap sync android",
+    "open:android": "cap open android"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.0"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/core": "^8.0.0"
+  }
+}

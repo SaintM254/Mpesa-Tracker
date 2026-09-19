@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">M-PESA Tracker</string>
+    <string name="title_activity_main">M-PESA Tracker</string>
+    <string name="package_name">com.saintm254.mpesatracker</string>
+    <string name="custom_url_scheme">com.saintm254.mpesatracker</string>
+</resources>

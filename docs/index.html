@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>M-PESA Tracker — Automatic SMS expense tracking for Android</title>
+  <meta name="description" content="M-PESA Tracker is a private, offline Android app that automatically reads your M-PESA SMS messages and turns them into a clean, categorized expense dashboard." />
+  <meta name="theme-color" content="#0f7b3a" />
+  <meta property="og:title" content="M-PESA Tracker — Automatic SMS expense tracking" />
+  <meta property="og:description" content="A private, offline Android app that turns M-PESA SMS into a smart expense dashboard." />
+  <meta property="og:type" content="website" />
+
+  <!-- Poppins -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Material Icons (rounded/solid-flavour via CSS) -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+
+  <link rel="stylesheet" href="./assets/style.css" />
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header" id="top">
+    <div class="container nav">
+      <a class="brand" href="#top" aria-label="M-PESA Tracker home">
+        <span class="brand-mark" aria-hidden="true">
+          <span class="material-icons-round">account_balance_wallet</span>
+        </span>
+        <span class="brand-name">M-PESA <span class="brand-name-accent">Tracker</span></span>
+      </a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#features">Features</a>
+        <a href="#dashboard">Dashboard</a>
+        <a href="#privacy">Privacy</a>
+        <a href="#download" class="nav-cta">Download</a>
+      </nav>
+      <div class="nav-actions">
+        <button id="themeToggle" class="icon-btn theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+          <span class="material-icons-round" data-icon="light">dark_mode</span>
+          <span class="material-icons-round" data-icon="dark">light_mode</span>
+        </button>
+        <a href="#download" class="btn btn-primary btn-sm">Download APK</a>
+  </div>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow">
+            <span class="material-icons-round">verified</span>
+            Built for Android · Works offline
+          </span>
+          <h1 class="hero-title">
+            Every <span class="text-accent">M-PESA</span> SMS,<br />
+            automatically <span class="text-accent-2">categorized</span>.
+          </h1>
+          <p class="hero-sub">
+            M-PESA Tracker reads your transaction SMS the moment they arrive and turns them into a clean,
+            private expense dashboard — no login, no cloud, no subscriptions. Just install the APK and you're set.
+          </p>
+
+          <div class="hero-cta">
+            <a class="btn btn-primary btn-lg" href="#download">
+              <span class="material-icons-round">download</span>
+              Download APK
+            </a>
+            <a class="btn btn-ghost btn-lg" href="#features">
+              <span class="material-icons-round">play_arrow</span>
+              See features
+            </a>
+          </div>
+
+          <ul class="hero-points" aria-label="Highlights">
+            <li><span class="material-icons-round">check_circle</span> Reads M-PESA SMS automatically</li>
+            <li><span class="material-icons-round">check_circle</span> Works 100% offline</li>
+            <li><span class="material-icons-round">check_circle</span> No account required</li>
+          </ul>
+        </div>
+
+        <div class="hero-visual" aria-hidden="true">
+          <!-- Phone mockup with dashboard -->
+          <div class="phone">
+            <div class="phone-frame">
+              <div class="phone-notch"></div>
+              <div class="phone-screen">
+                <div class="status-bar">
+                  <span>9:41</span>
+                  <span class="status-icons">
+                    <span class="material-icons-round">signal_cellular_alt</span>
+                    <span class="material-icons-round">wifi</span>
+                    <span class="material-icons-round">battery_full</span>
+                  </span>
+                </div>
+
+                <div class="dash-header">
+                  <div>
+                    <p class="dash-hello">Good morning,</p>
+                    <h3 class="dash-name">Brian Otieno</h3>
+                  </div>
+                  <div class="dash-avatar" aria-hidden="true">BO</div>
+                </div>
+
+                <div class="balance-card">
+                  <div class="balance-row">
+                    <div>
+                      <p class="balance-label">Total spent · September</p>
+                      <h2 class="balance-amount">KSh <span>14,820</span></h2>
+                    </div>
+                    <div class="balance-trend">
+                      <span class="material-icons-round">trending_down</span>
+                      12% vs Aug
+                    </div>
+                  </div>
+                  <div class="balance-chart" role="img" aria-label="Weekly spending chart">
+                    <span style="--h:42%"></span>
+                    <span style="--h:62%"></span>
+                    <span style="--h:38%"></span>
+                    <span style="--h:78%"></span>
+                    <span style="--h:54%"></span>
+                    <span style="--h:92%"></span>
+                    <span style="--h:70%"></span>
+                  </div>
+                  <div class="balance-foot">
+                    <span>This week</span>
+                    <span class="dot"></span>
+                    <span>Last week</span>
+                  </div>
+                </div>
+
+                <div class="section-title">
+                  <h4>Recent transactions</h4>
+                  <a href="#" class="link">All</a>
+                </div>
+
+                <ul class="tx-list">
+                  <li class="tx">
+                    <span class="tx-icon tx-icon--food"><span class="material-icons-round">restaurant</span></span>
+                    <div class="tx-body">
+                      <p class="tx-title">Java House — Westlands</p>
+                      <p class="tx-meta">Food &amp; drinks · Today 12:42</p>
+                    </div>
+                    <div class="tx-amount tx-amount--out">− KSh 850</div>
+                  </li>
+
+                  <li class="tx">
+                    <span class="tx-icon tx-icon--transport"><span class="material-icons-round">directions_bus</span></span>
+                    <div class="tx-body">
+                      <p class="tx-title">Matatu · Kenyatta Ave</p>
+                      <p class="tx-meta">Transport · Today 08:15</p>
+                    </div>
+                    <div class="tx-amount tx-amount--out">− KSh 100</div>
+                  </li>
+
+                  <li class="tx">
+                    <span class="tx-icon tx-icon--airtime"><span class="material-icons-round">phone_android</span></span>
+                    <div class="tx-body">
+                      <p class="tx-title">Safaricom airtime</p>
+                      <p class="tx-meta">Airtime · Yesterday 19:08</p>
+                    </div>
+                    <div class="tx-amount tx-amount--out">− KSh 200</div>
+                  </li>
+
+                  <li class="tx">
+                    <span class="tx-icon tx-icon--received"><span class="material-icons-round">arrow_downward</span></span>
+                    <div class="tx-body">
+                      <p class="tx-title">Salary — Acme Ltd</p>
+                      <p class="tx-meta">Income · Yesterday 09:01</p>
+                    </div>
+                    <div class="tx-amount tx-amount--in">+ KSh 45,000</div>
+                  </li>
+
+                  <li class="tx">
+                    <span class="tx-icon tx-icon--utilities"><span class="material-icons-round">bolt</span></span>
+                    <div class="tx-body">
+                      <p class="tx-title">KPLC prepaid tokens</p>
+                      <p class="tx-meta">Utilities · 02 Sep</p>
+                    </div>
+                    <div class="tx-amount tx-amount--out">− KSh 1,500</div>
+                  </li>
+                </ul>
+
+                <div class="dock">
+                  <span class="dock-item is-active"><span class="material-icons-round">dashboard</span></span>
+                  <span class="dock-item"><span class="material-icons-round">pie_chart</span></span>
+                  <span class="dock-item"><span class="material-icons-round">add</span></span>
+                  <span class="dock-item"><span class="material-icons-round">category</span></span>
+                  <span class="dock-item"><span class="material-icons-round">settings</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Decorative blobs -->
+          <span class="blob blob-1"></span>
+          <span class="blob blob-2"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- TRUST / LOGOS STRIP -->
+    <section class="trust">
+      <div class="container">
+        <p class="trust-line">Trusted by users managing</p>
+        <ul class="trust-stats">
+          <li><strong>0</strong><span>data sent to servers</span></li>
+          <li><strong>100%</strong><span>on-device storage</span></li>
+          <li><strong>&lt; 6 MB</strong><span>APK size</span></li>
+          <li><strong>Android 8+</strong><span>supported</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section class="features" id="features">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow eyebrow--center">
+            <span class="material-icons-round">auto_awesome</span>
+            Built around your M-PESA
+          </span>
+          <h2 class="section-title-h">Everything you need to <span class="text-accent">understand</span> your money</h2>
+          <p class="section-sub">Four core capabilities that turn a noisy SMS inbox into a calm, useful dashboard.</p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card feature-card--lg">
+            <span class="feature-icon feature-icon--green"><span class="material-icons-round">sms</span></span>
+            <h3>Automatic M-PESA SMS parsing</h3>
+            <p>M-PESA Tracker listens for M-PESA confirmation SMSes the moment they land in your inbox and extracts the merchant, amount, balance, and reference code. No manual entry, no copy-paste — every Till, Paybill and person-to-person transfer is captured and tagged the instant you receive it.</p>
+            <ul class="feature-list">
+              <li><span class="material-icons-round">check_circle</span> Recognises M-PESA, Airtel Money and T-Kash formats</li>
+              <li><span class="material-icons-round">check_circle</span> Smart duplicate detection across retries</li>
+              <li><span class="material-icons-round">check_circle</span> Works with double-SIM devices</li>
+            </ul>
+          </article>
+
+          <article class="feature-card">
+            <span class="feature-icon feature-icon--amber"><span class="material-icons-round">category</span></span>
+            <h3>Custom presets &amp; categories</h3>
+            <p>Pre-loaded with the categories Kenyans actually use — <em>Food, Matatu, KPLC, Rent, School fees</em> — and fully editable. Create your own rules so your regular KPLC paybill number always lands in <em>Utilities</em>.</p>
+          </article>
+
+          <article class="feature-card">
+            <span class="feature-icon feature-icon--violet"><span class="material-icons-round">palette</span></span>
+            <h3>Material You dynamic interface</h3>
+            <p>Dynamic colour, generous rounded corners and distinct surface tints adapt to your system theme. Switch between Light and Dark with one tap — both modes are first-class, contrast-checked and easy on the eyes.</p>
+            <div class="theme-chips" aria-hidden="true">
+              <span class="chip chip-light">Light</span>
+              <span class="chip chip-dark">Dark</span>
+              <span class="chip chip-system">System</span>
+            </div>
+          </article>
+
+          <article class="feature-card">
+            <span class="feature-icon feature-icon--blue"><span class="material-icons-round">offline_bolt</span></span>
+            <h3>100% offline, local storage</h3>
+            <p>Everything is written directly to your phone's private app folder — no accounts, no analytics, no remote server. Your money history stays on your device, even on Airplane mode.</p>
+            <p class="feature-foot"><span class="material-icons-round">lock</span> Requires <code>RECEIVE_SMS</code> permission only.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- DASHBOARD DEEP DIVE -->
+    <section class="dashboard" id="dashboard">
+      <div class="container dash-grid">
+        <div class="dash-copy">
+          <span class="eyebrow"><span class="material-icons-round">insights</span> The dashboard</span>
+          <h2 class="section-title-h">A summary that <span class="text-accent-2">actually summarises</span></h2>
+          <p class="section-sub">A glanceable home screen with monthly totals, week-over-week delta, and a categorised, colour-coded list of every M-PESA transaction — all parsed from SMS in real time.</p>
+
+          <ul class="dash-points">
+            <li>
+              <span class="dash-point-icon dash-point-icon--green"><span class="material-icons-round">restaurant</span></span>
+              <div>
+                <h4>Categorised by colour</h4>
+                <p>Each category — Food, Transport, Utilities, Airtime, Rent, Shopping, Savings — has a distinct, accessible colour in both Light and Dark mode.</p>
+              </div>
+            </li>
+            <li>
+              <span class="dash-point-icon dash-point-icon--violet"><span class="material-icons-round">savings</span></span>
+              <div>
+                <h4>Income vs expense</h4>
+                <p>Sent and received payments are split automatically. See your real net spend for the month, not just a long transaction list.</p>
+              </div>
+            </li>
+            <li>
+              <span class="dash-point-icon dash-point-icon--amber"><span class="material-icons-round">search</span></span>
+              <div>
+                <h4>Searchable history</h4>
+                <p>Find any transaction by merchant, amount or reference code — perfect for reconciling that one Till payment from last week.</p>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="dash-visual">
+          <div class="phone phone--small">
+            <div class="phone-frame">
+              <div class="phone-notch"></div>
+              <div class="phone-screen">
+                <div class="status-bar"><span>9:41</span><span class="status-icons"><span class="material-icons-round">signal_cellular_alt</span><span class="material-icons-round">wifi</span><span class="material-icons-round">battery_full</span></span></div>
+
+                <div class="summary-card">
+                  <p class="summary-label">September summary</p>
+                  <h3 class="summary-amount">KSh 14,820</h3>
+                  <div class="summary-grid">
+                    <div class="stat stat--in">
+                      <p>Income</p>
+                      <strong>KSh 45,000</strong>
+                    </div>
+                    <div class="stat stat--out">
+                      <p>Expenses</p>
+                      <strong>KSh 14,820</strong>
+                    </div>
+                    <div class="stat stat--net">
+                      <p>Net</p>
+                      <strong>KSh 30,180</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <p class="dash-section-label">By category</p>
+                <ul class="cat-list">
+                  <li>
+                    <span class="cat-dot cat-dot--food"></span>
+                    <span class="cat-name">Food &amp; drinks</span>
+                    <span class="cat-bar"><span style="--w:78%"></span></span>
+                    <span class="cat-amt">KSh 5,420</span>
+                  </li>
+                  <li>
+                    <span class="cat-dot cat-dot--transport"></span>
+                    <span class="cat-name">Transport</span>
+                    <span class="cat-bar"><span style="--w:42%"></span></span>
+                    <span class="cat-amt">KSh 2,900</span>
+                  </li>
+                  <li>
+                    <span class="cat-dot cat-dot--utilities"></span>
+                    <span class="cat-name">Utilities</span>
+                    <span class="cat-bar"><span style="--w:64%"></span></span>
+                    <span class="cat-amt">KSh 4,500</span>
+                  </li>
+                  <li>
+                    <span class="cat-dot cat-dot--airtime"></span>
+                    <span class="cat-name">Airtime &amp; data</span>
+                    <span class="cat-bar"><span style="--w:28%"></span></span>
+                    <span class="cat-amt">KSh 1,000</span>
+                  </li>
+                  <li>
+                    <span class="cat-dot cat-dot--shopping"></span>
+                    <span class="cat-name">Shopping</span>
+                    <span class="cat-bar"><span style="--w:18%"></span></span>
+                    <span class="cat-amt">KSh 1,000</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PRIVACY -->
+    <section class="privacy" id="privacy">
+      <div class="container privacy-grid">
+        <div class="privacy-card">
+          <span class="feature-icon feature-icon--green"><span class="material-icons-round">shield</span></span>
+          <h3>Privacy by default</h3>
+          <p>The app has no internet permission at all. It cannot upload your SMS even if it wanted to. Your transaction history lives in a private app folder only this APK can read.</p>
+        </div>
+        <div class="privacy-card">
+          <span class="feature-icon feature-icon--violet"><span class="material-icons-round">vpn_key</span></span>
+          <h3>Your data, your export</h3>
+          <p>Export everything to CSV whenever you like. Nothing leaves your phone — useful for taxes, audits, or simply keeping your own backup.</p>
+        </div>
+        <div class="privacy-card">
+          <span class="feature-icon feature-icon--amber"><span class="material-icons-round">visibility_off</span></span>
+          <h3>Zero tracking</h3>
+          <p>No analytics SDKs. No crash reporters that phone home. No ads. The first screen you see is your dashboard, not a sign-up wall.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- DOWNLOAD / CTA -->
+    <section class="download" id="download">
+      <div class="container download-card">
+        <div>
+          <span class="eyebrow"><span class="material-icons-round">android</span> Android APK</span>
+          <h2 class="section-title-h">Install in 30 seconds</h2>
+          <p class="section-sub">Download the latest signed APK, allow <em>Install unknown apps</em> for your browser, and you're done. No Play Store required.</p>
+          <div class="download-meta">
+            <span><span class="material-icons-round">memory</span> ~6 MB</span>
+            <span><span class="material-icons-round">phonelink_setup</span> Android 8.0+</span>
+            <span><span class="material-icons-round">verified</span> Signed release</span>
+          </div>
+          <div class="download-cta">
+            <a id="downloadBtn" class="btn btn-primary btn-lg" href="#">
+              <span class="material-icons-round">download</span>
+              Download latest APK
+            </a>
+            <a class="btn btn-ghost btn-lg" href="https://github.com/SaintM254/Mpesa-Tracker/releases" target="_blank" rel="noopener">
+              <span class="material-icons-round">open_in_new</span>
+              All releases
+            </a>
+          </div>
+          <p class="download-foot">
+            Tip — latest version is queried from the GitHub <code>releases/latest</code> API and falls back to
+            <code>releases/download/latest/app-release.apk</code>.
+          </p>
+        </div>
+
+        <div class="download-side" aria-hidden="true">
+          <span class="material-icons-round android-icon">android</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-grid">
+      <div>
+        <a class="brand" href="#top">
+          <span class="brand-mark"><span class="material-icons-round">account_balance_wallet</span></span>
+          <span class="brand-name">M-PESA <span class="brand-name-accent">Tracker</span></span>
+        </a>
+        <p class="footer-tag">An open-source Android app that turns M-PESA SMS into a calm, private expense dashboard.</p>
+      </div>
+      <div>
+        <p class="footer-title">Project</p>
+        <ul>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#privacy">Privacy</a></li>
+          <li><a href="#download">Download</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-title">Source</p>
+        <ul>
+          <li><a href="https://github.com/SaintM254/Mpesa-Tracker" target="_blank" rel="noopener">GitHub repo</a></li>
+          <li><a href="https://github.com/SaintM254/Mpesa-Tracker/releases" target="_blank" rel="noopener">Releases</a></li>
+          <li><a href="https://github.com/SaintM254/Mpesa-Tracker/issues" target="_blank" rel="noopener">Issues</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <p>© <span id="year"></span> M-PESA Tracker. Not affiliated with Safaricom PLC.</p>
+      <p>M-PESA is a registered trademark of Safaricom PLC.</p>
+    </div>
+  </footer>
+
+  <script src="./assets/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "appId": "com.saintm254.mpesatracker",
+  "appName": "M-PESA Tracker",
+  "webDir": "docs",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#0f7b3aFF"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

@@ -1,0 +1,180 @@
+name: Build & release Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag (e.g. v1.0.0)"
+        required: true
+        default: "v1.0.0"
+      release_name:
+        description: "Release display name"
+        required: true
+        default: "M-PESA Tracker v1.0.0"
+      upload_release:
+        description: "Publish a GitHub release for this build?"
+        type: boolean
+        default: true
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - 'android/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Assemble signed APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # ---- Keystore handling ----
+      # Prefer a long-lived keystore stored as a repo secret so successive
+      # releases are signed with the same identity. If no secret is configured
+      # yet, generate a fresh keystore just for this build (works, but each
+      # build will be a different signing identity until the user commits the
+      # keystore into repo secrets).
+      - name: Prepare signing keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASS:   ${{ secrets.KEYSTORE_PASS }}
+          KEY_ALIAS:       ${{ secrets.KEY_ALIAS }}
+          KEY_PASS:        ${{ secrets.KEY_PASS }}
+        run: |
+          set -e
+          mkdir -p android/signing
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Using signing keystore from KEYSTORE_BASE64 secret."
+            echo "$KEYSTORE_BASE64" | base64 -d > android/signing/release.jks
+            echo "storeFile=signing/release.jks"          >  android/keystore.properties
+            echo "storePassword=$KEYSTORE_PASS"           >> android/keystore.properties
+            echo "keyAlias=$KEY_ALIAS"                    >> android/keystore.properties
+            echo "keyPassword=$KEY_PASS"                  >> android/keystore.properties
+          else
+            echo "No KEYSTORE_BASE64 secret — generating an ephemeral keystore for this build."
+            KEY_PASS="mpesa-ephemeral-$GITHUB_RUN_ID"
+            ALIAS="mpesatracker"
+            KS_PASS="$KEY_PASS"
+            keytool -genkeypair \
+              -keystore android/signing/release.jks \
+              -alias "$ALIAS" \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=M-PESA Tracker, OU=App, O=SaintM254, L=Nairobi, ST=Nairobi, C=KE" \
+              -storepass "$KS_PASS" -keypass "$KS_PASS" \
+              -storetype JKS
+            echo "storeFile=signing/release.jks"  >  android/keystore.properties
+            echo "storePassword=$KS_PASS"          >> android/keystore.properties
+            echo "keyAlias=$ALIAS"                 >> android/keystore.properties
+            echo "keyPassword=$KS_PASS"            >> android/keystore.properties
+          fi
+          ls -lh android/signing/release.jks
+
+      - name: Install Capacitor deps
+        run: npm install --no-audit --no-fund
+
+      - name: Sync web build into Android
+        run: npx cap sync android
+
+      - name: Build signed release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon --warning-mode=summary
+
+      - name: Locate APK
+        id: locate
+        working-directory: android
+        run: |
+          APK_PATH=$(find app/build/outputs/apk/release -name '*.apk' | head -n1)
+          if [ -z "$APK_PATH" ]; then
+            echo "::error::No APK produced"
+            exit 1
+          fi
+          echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
+          ls -lh "$APK_PATH"
+
+      - name: Verify APK signature
+        working-directory: android
+        run: |
+          APK="${{ steps.locate.outputs.apk_path }}"
+          $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | sort -V | tail -1)/apksigner verify --verbose --print-certs "$APK"
+
+      - name: Stage release artefacts
+        run: |
+          mkdir -p release
+          cp "android/${{ steps.locate.outputs.apk_path }}" release/app-release.apk
+          sha256sum release/app-release.apk > release/SHA256SUMS.txt
+          ls -lh release/
+
+      - name: Upload artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: release/
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.upload_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release artefacts
+        uses: actions/download-artifact@v4
+        with:
+          name: app-release
+          path: dist
+
+      - name: Determine release tag / name
+        id: meta
+        env:
+          INPUT_TAG:  ${{ inputs.release_tag }}
+          INPUT_NAME: ${{ inputs.release_name }}
+        run: |
+          if [ -n "$INPUT_TAG" ];  then TAG="$INPUT_TAG";   else TAG="v$(date -u +%Y.%m.%d-%H%M)"; fi
+          if [ -n "$INPUT_NAME" ]; then NAME="$INPUT_NAME"; else NAME="M-PESA Tracker $TAG";        fi
+          echo "tag=$TAG"  >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.name }}
+          body: |
+            ## M-PESA Tracker — Android APK
+
+            Offline, private M-PESA transaction tracker wrapped as a Capacitor
+            WebView app pointing at the `/docs` landing page / app shell.
+
+            ### Install
+            1. Download `app-release.apk` below.
+            2. On your phone, allow *Install unknown apps* for the browser you used.
+            3. Open the APK and tap **Install**.
+
+            **Compatibility:** Android 8.0+
+            **File size:** ~6 MB
+            **Permissions:** none beyond standard WebView runtime.
+            **SHA-256:** see `SHA256SUMS.txt` next to the APK.
+          draft: false
+          prerelease: false
+          files: |
+            dist/app-release.apk
+            dist/SHA256SUMS.txt
