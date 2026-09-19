@@ -17,11 +17,6 @@ on:
         default: true
   push:
     branches: [main]
-    paths:
-      - 'docs/**'
-      - 'capacitor.config.json'
-      - 'package.json'
-      - 'android/**'
 
 permissions:
   contents: write
