@@ -62,10 +62,12 @@ jobs:
           KEY_PASS:        ${{ secrets.KEY_PASS }}
         run: |
           set -e
-          mkdir -p android/signing
+          # The app module looks for the keystore at `signing/release.jks`
+          # relative to android/app/, so we write it into android/app/signing/.
+          mkdir -p android/app/signing
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "Using signing keystore from KEYSTORE_BASE64 secret."
-            echo "$KEYSTORE_BASE64" | base64 -d > android/signing/release.jks
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/signing/release.jks
             echo "storeFile=signing/release.jks"          >  android/keystore.properties
             echo "storePassword=$KEYSTORE_PASS"           >> android/keystore.properties
             echo "keyAlias=$KEY_ALIAS"                    >> android/keystore.properties
@@ -76,7 +78,7 @@ jobs:
             ALIAS="mpesatracker"
             KS_PASS="$KEY_PASS"
             keytool -genkeypair \
-              -keystore android/signing/release.jks \
+              -keystore android/app/signing/release.jks \
               -alias "$ALIAS" \
               -keyalg RSA -keysize 2048 -validity 10000 \
               -dname "CN=M-PESA Tracker, OU=App, O=SaintM254, L=Nairobi, ST=Nairobi, C=KE" \
@@ -87,7 +89,7 @@ jobs:
             echo "keyAlias=$ALIAS"                 >> android/keystore.properties
             echo "keyPassword=$KS_PASS"            >> android/keystore.properties
           fi
-          ls -lh android/signing/release.jks
+          ls -lh android/app/signing/release.jks
 
       - name: Install Capacitor deps
         run: npm install --no-audit --no-fund
