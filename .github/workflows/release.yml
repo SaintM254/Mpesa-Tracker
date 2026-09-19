@@ -114,48 +114,11 @@ jobs:
           echo "=== Sync exit OK ==="
         shell: bash
 
-      - name: Upload diagnostics on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cap-sync-log
-          path: |
-            /tmp/cap-sync.log
-            android/
-            docs/
-          if-no-files-found: ignore
-
-      - name: Post failure log to GitHub issue
-        if: failure() && steps.sync.conclusion == 'failure'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          {
-            echo "## ❌ Build failed — run #${{ github.run_number }}"
-            echo
-            echo "**Branch:** ${{ github.ref_name }}"
-            echo "**Commit:** ${{ github.sha }}"
-            echo "**Run:** ${{ github.html_url }}"
-            echo
-            echo '<details><summary>cap sync log</summary>'
-            echo
-            echo '```'
-            cat /tmp/cap-sync.log 2>/dev/null || echo '(no log)'
-            echo '```'
-            echo
-            echo '</details>'
-          } > /tmp/body.md
-
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/issues \
-            -f title="ci: build failure #${{ github.run_number }} on ${{ github.sha }}" \
-            -f body="$(cat /tmp/body.md)" 2>&1 | tee /tmp/gh-post.log || true
-
       - name: Build signed release APK
+        id: gradle
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon --warning-mode=summary
+        run: ./gradlew assembleRelease --no-daemon --warning-mode=summary 2>&1 | tee /tmp/gradle.log
+        shell: bash
 
       - name: Locate APK
         id: locate
@@ -188,6 +151,43 @@ jobs:
           name: app-release
           path: release/
           if-no-files-found: error
+
+      # ---- Failure diagnostics: post log to a GitHub issue ----
+      - name: Post failure log to GitHub issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "## ❌ Build failed — run #${{ github.run_number }}"
+            echo
+            echo "**Branch:** ${{ github.ref_name }}"
+            echo "**Commit:** ${{ github.sha }}"
+            echo "**Run:** ${{ github.html_url }}"
+            echo
+            echo '<details><summary>cap sync log</summary>'
+            echo
+            echo '```'
+            tail -c 60000 /tmp/cap-sync.log 2>/dev/null || echo '(no log)'
+            echo '```'
+            echo
+            echo '</details>'
+            echo
+            echo '<details><summary>gradle log (tail)</summary>'
+            echo
+            echo '```'
+            tail -c 60000 /tmp/gradle.log 2>/dev/null || echo '(no log)'
+            echo '```'
+            echo
+            echo '</details>'
+          } > /tmp/body.md
+
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/issues \
+            -f title="ci: build failure #${{ github.run_number }} on ${{ github.sha }}" \
+            -f body="$(cat /tmp/body.md)" 2>&1 | tee /tmp/gh-post.log || true
 
   release:
     name: Publish GitHub Release
