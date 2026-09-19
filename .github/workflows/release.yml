@@ -124,6 +124,19 @@ jobs:
             docs/
           if-no-files-found: ignore
 
+      - name: Post failure log as commit comment
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo '### ❌ Build failed'; echo; echo '```'; cat /tmp/cap-sync.log 2>/dev/null || echo '(no cap-sync.log)'; echo '```'; } > /tmp/comment.md
+          # Use the gh CLI to post a status check / commit comment
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/commits/${{ github.sha }}/comments \
+            -f body="$(cat /tmp/comment.md)" 2>&1 || true
+
       - name: Build signed release APK
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon --warning-mode=summary
