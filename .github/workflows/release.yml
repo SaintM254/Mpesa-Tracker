@@ -21,6 +21,11 @@ on:
 permissions:
   contents: write
 
+# Concurrency so runs don't fight each other
+concurrency:
+  group: release
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Assemble signed APK
@@ -87,7 +92,37 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: Sync web build into Android
-        run: npx cap sync android
+        id: sync
+        run: |
+          set -e
+          set -o pipefail
+          echo "=== Diagnostics ==="
+          node --version
+          npx --version
+          echo "--- Capacitor installed version ---"
+          npx cap --version || true
+          echo "--- Files in android project ---"
+          ls -la android/
+          echo "--- Files in docs ---"
+          ls -la docs/ docs/assets/
+          echo "--- Running cap sync ---"
+          if ! npx cap sync android 2>&1 | tee /tmp/cap-sync.log; then
+            echo "::error::cap sync failed"
+            exit 1
+          fi
+          echo "=== Sync exit OK ==="
+        shell: bash
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cap-sync-log
+          path: |
+            /tmp/cap-sync.log
+            android/
+            docs/
+          if-no-files-found: ignore
 
       - name: Build signed release APK
         working-directory: android
