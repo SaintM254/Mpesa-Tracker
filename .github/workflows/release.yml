@@ -39,7 +39,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Setup Java 17
@@ -126,7 +126,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Post failure log to GitHub issue
-        if: failure()
+        if: failure() && steps.sync.conclusion == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
