@@ -1,0 +1,35 @@
+# Node / Capacitor
+node_modules/
+.npm/
+npm-debug.log*
+
+# Android
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
+android/captures/
+android/.idea/
+android/*.iml
+android/app/*.iml
+android/app/release/
+android/app/debug/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+
+# Sign / keystores — DO NOT commit
+*.jks
+*.keystore
+keystore.properties
+android/keystore.properties
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Misc
+dist/
+build/
