@@ -194,7 +194,11 @@ jobs:
   release:
     name: Publish GitHub Release
     needs: build
-    if: github.event_name == 'workflow_dispatch' && inputs.upload_release == 'true'
+    # Publish on push to main (with an automatic date-tagged release) or when
+    # the user runs the workflow manually with upload_release=true.
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.upload_release == 'true')
     runs-on: ubuntu-latest
     steps:
       - name: Download release artefacts
@@ -209,8 +213,13 @@ jobs:
           INPUT_TAG:  ${{ inputs.release_tag }}
           INPUT_NAME: ${{ inputs.release_name }}
         run: |
-          if [ -n "$INPUT_TAG" ];  then TAG="$INPUT_TAG";   else TAG="v$(date -u +%Y.%m.%d-%H%M)"; fi
-          if [ -n "$INPUT_NAME" ]; then NAME="$INPUT_NAME"; else NAME="M-PESA Tracker $TAG";        fi
+          if [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          else
+            SHA="$(echo "${{ github.sha }}" | cut -c1-7)"
+            TAG="v0.0.0+${SHA}-$(date -u +%Y%m%d-%H%M)"
+          fi
+          if [ -n "$INPUT_NAME" ]; then NAME="$INPUT_NAME"; else NAME="M-PESA Tracker $TAG"; fi
           echo "tag=$TAG"  >> "$GITHUB_OUTPUT"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
 
