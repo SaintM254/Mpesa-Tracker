@@ -6,6 +6,6 @@
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="14" fill="url(#g)"/>
-  <text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle"
-        font-family="Poppins, sans-serif" font-weight="800" font-size="28" fill="#ffffff">M</text>
+  <path d="M16 46 L16 18 L22 18 L32 32 L42 18 L48 18 L48 46 L42 46 L42 29 L34 40 L30 40 L22 29 L22 46 Z" fill="#ffffff"/>
+  <circle cx="46" cy="22" r="4.5" fill="#ff7a00"/>
 </svg>

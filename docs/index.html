@@ -7,33 +7,32 @@
   <meta name="description" content="Offline, private M-PESA SMS expense tracker." />
   <meta name="theme-color" content="#0f7b3a" />
 
-  <!-- Poppins & Material Icons Round -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
-
+  <!-- 100% offline: no remote fonts or assets. Icons are inline SVG vectors. -->
   <link rel="stylesheet" href="./assets/style.css" />
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
 </head>
 <body class="app-body">
 
-  <!-- Main App Viewport (Matches the exact mockup shown on landing screenshot) -->
+  <!-- Main App Viewport -->
   <div class="app-viewport">
-    
+
     <!-- Top Bar / Header -->
     <header class="app-topbar">
       <div class="dash-header">
         <div class="dash-user">
-          <p class="dash-hello">Good morning,</p>
-          <h2 class="dash-name" id="userGreeting">Brian Otieno</h2>
+          <p class="dash-hello" id="helloLine">Karibu,</p>
+          <h2 class="dash-name" id="userGreeting">M-PESA User</h2>
         </div>
         <div class="topbar-actions">
           <button id="themeToggle" class="icon-btn-round" title="Toggle theme" aria-label="Toggle theme">
-            <span class="material-icons-round" data-icon="light">dark_mode</span>
-            <span class="material-icons-round" data-icon="dark">light_mode</span>
+            <span class="ic-holder" data-icon="light">
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </span>
+            <span class="ic-holder" data-icon="dark">
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+            </span>
           </button>
-          <div class="dash-avatar" id="avatarBtn" title="Profile">BO</div>
+          <div class="dash-avatar" id="avatarBtn" title="Profile">MU</div>
         </div>
       </div>
     </header>
@@ -43,35 +42,48 @@
 
       <!-- TAB 1: DASHBOARD -->
       <section id="view-dashboard" class="app-tab-view is-active">
-        
+
+        <!-- SMS Permission Banner (shown if first-run modal was dismissed) -->
+        <div class="perm-banner" id="permBanner" style="display:none;">
+          <div class="perm-banner-icon">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <div class="perm-banner-text">
+            <strong>SMS access needed</strong>
+            <p>Allow SMS access to auto-track M-PESA messages.</p>
+          </div>
+          <div class="perm-banner-actions">
+            <button class="btn btn-sm btn-primary" id="bannerScanBtn">Enable</button>
+            <button class="icon-btn-ghost" id="bannerDismissBtn" aria-label="Dismiss">
+              <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+        </div>
+
         <!-- Balance Hero Card -->
         <div class="balance-card">
           <div class="balance-row">
             <div>
-              <p class="balance-label">Total spent · September</p>
-              <h2 class="balance-amount" id="dashTotalSpent">KSh <span>14,820</span></h2>
+              <p class="balance-label" id="dashMonthLabel">Total spent · This month</p>
+              <h2 class="balance-amount" id="dashTotalSpent">KSh <span>0</span></h2>
             </div>
-            <div class="balance-trend" id="dashTrend">
-              <span class="material-icons-round">trending_down</span>
-              <span>12% vs Aug</span>
-            </div>
+            <div class="balance-trend" id="dashTrend" style="display:none;"></div>
           </div>
 
-          <!-- Interactive weekly canvas-based visual bars -->
-          <div class="balance-chart" id="weeklyBars" role="img" aria-label="Weekly spending chart">
-            <span style="--h:42%" title="Mon: KSh 1,200"></span>
-            <span style="--h:62%" title="Tue: KSh 2,400"></span>
-            <span style="--h:38%" title="Wed: KSh 950"></span>
-            <span style="--h:78%" title="Thu: KSh 3,850"></span>
-            <span style="--h:54%" title="Fri: KSh 2,100"></span>
-            <span style="--h:92%" title="Sat: KSh 4,320"></span>
-            <span style="--h:70%" title="Sun: KSh 2,800"></span>
+          <!-- Weekly activity bars (rendered from real data) -->
+          <div class="balance-chart" id="weeklyBars" role="img" aria-label="Daily spending chart, last 7 days">
+            <span style="--h:6%"></span>
+            <span style="--h:6%"></span>
+            <span style="--h:6%"></span>
+            <span style="--h:6%"></span>
+            <span style="--h:6%"></span>
+            <span style="--h:6%"></span>
+            <span style="--h:6%"></span>
           </div>
 
           <div class="balance-foot">
-            <span class="legend-item"><span class="dot active"></span>This week</span>
-            <span class="legend-item"><span class="dot"></span>Last week</span>
-            <span class="foot-net" id="dashNetTotal">Net: +KSh 30,180</span>
+            <span class="legend-item"><span class="dot active"></span>Last 7 days</span>
+            <span class="foot-net" id="dashNetTotal">Net: KSh 0</span>
           </div>
         </div>
 
@@ -79,15 +91,15 @@
         <div class="mini-stats-grid">
           <div class="mini-stat mini-stat--in">
             <span class="mini-stat-label">Income</span>
-            <span class="mini-stat-val" id="miniIncome">+KSh 45,000</span>
+            <span class="mini-stat-val" id="miniIncome">+KSh 0</span>
           </div>
           <div class="mini-stat mini-stat--out">
             <span class="mini-stat-label">Expenses</span>
-            <span class="mini-stat-val" id="miniExpenses">−KSh 14,820</span>
+            <span class="mini-stat-val" id="miniExpenses">−KSh 0</span>
           </div>
           <div class="mini-stat mini-stat--count">
             <span class="mini-stat-label">Captured</span>
-            <span class="mini-stat-val" id="miniCount">18 SMS</span>
+            <span class="mini-stat-val" id="miniCount">0 items</span>
           </div>
         </div>
 
@@ -99,11 +111,11 @@
 
         <!-- Transaction Feed -->
         <ul class="tx-list" id="dashboardTxList">
-          <!-- Dynamically populated or rendered from state -->
+          <li class="empty-state">No M-PESA transactions yet. Grant SMS access or paste a message in the Add tab.</li>
         </ul>
       </section>
 
-      <!-- TAB 2: ANALYTICS / PIE -->
+      <!-- TAB 2: ANALYTICS -->
       <section id="view-analytics" class="app-tab-view">
         <div class="view-header">
           <h3>Spending Breakdown</h3>
@@ -111,20 +123,20 @@
         </div>
 
         <div class="summary-card">
-          <p class="summary-label">September breakdown</p>
-          <h3 class="summary-amount" id="analyticsTotal">KSh 14,820</h3>
+          <p class="summary-label" id="analyticsMonthLabel">This month</p>
+          <h3 class="summary-amount" id="analyticsTotal">KSh 0</h3>
           <div class="summary-grid">
             <div class="stat stat--in">
               <p>Income</p>
-              <strong id="analyticsIn">KSh 45,000</strong>
+              <strong id="analyticsIn">KSh 0</strong>
             </div>
             <div class="stat stat--out">
               <p>Expenses</p>
-              <strong id="analyticsOut">KSh 14,820</strong>
+              <strong id="analyticsOut">KSh 0</strong>
             </div>
             <div class="stat stat--net">
               <p>Net Balance</p>
-              <strong id="analyticsNet">KSh 30,180</strong>
+              <strong id="analyticsNet">KSh 0</strong>
             </div>
           </div>
         </div>
@@ -133,7 +145,7 @@
         <div class="category-breakdown-card">
           <h4>Top Categories</h4>
           <div id="categoryBarsList" class="category-bars-list">
-            <!-- Rendered via JS -->
+            <p class="empty-hint">No expenses recorded yet.</p>
           </div>
         </div>
       </section>
@@ -148,13 +160,17 @@
         <div class="input-card">
           <label for="smsInputText" class="input-label">M-PESA Confirmation SMS</label>
           <textarea id="smsInputText" class="sms-textarea" rows="5" placeholder="e.g. QK73XYZ123 Confirmed. Ksh850.00 paid to JAVA HOUSE WESTLANDS on 20/9/26 at 12:42 PM. New M-PESA balance is Ksh4,120.00. Transaction cost, Ksh0.00."></textarea>
-          
+
+          <div class="sample-chips-row">
+            <button class="sample-chip" id="sample1Btn">↳ Try: Send money SMS</button>
+            <button class="sample-chip" id="sample2Btn">↳ Try: Buy Goods (Till) SMS</button>
+            <button class="sample-chip" id="sample3Btn">↳ Try: Received money SMS</button>
+          </div>
+
           <div class="parse-actions">
             <button class="btn btn-primary btn-block" id="parseSmsBtn">
-              <span class="material-icons-round">auto_awesome</span> Parse &amp; Save
-            </button>
-            <button class="btn btn-ghost btn-block" id="pasteSampleBtn">
-              <span class="material-icons-round">content_paste</span> Paste Sample SMS
+              <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"/></svg>
+              Parse &amp; Save
             </button>
           </div>
         </div>
@@ -162,11 +178,11 @@
         <div class="sms-help-card">
           <h4>Supported formats</h4>
           <ul>
-            <li><span class="material-icons-round">check_circle</span> Buy Goods / Till number</li>
-            <li><span class="material-icons-round">check_circle</span> Paybill &amp; Business Numbers (e.g. KPLC)</li>
-            <li><span class="material-icons-round">check_circle</span> Send Money / P2P transfers</li>
-            <li><span class="material-icons-round">check_circle</span> Received Money / Customer payments</li>
-            <li><span class="material-icons-round">check_circle</span> Safaricom Airtime &amp; Data bundles</li>
+            <li><svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> Buy Goods / Till number</li>
+            <li><svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> Paybill &amp; Business Numbers (e.g. KPLC)</li>
+            <li><svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> Send Money / P2P transfers</li>
+            <li><svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> Received Money / Customer payments</li>
+            <li><svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> Safaricom Airtime &amp; Data bundles</li>
           </ul>
         </div>
       </section>
@@ -193,18 +209,21 @@
         <div class="settings-list">
           <div class="settings-item">
             <div class="settings-meta">
-              <span class="material-icons-round">account_circle</span>
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               <div>
                 <strong>Display Name</strong>
                 <p>Personalize greeting</p>
               </div>
             </div>
-            <input type="text" id="nameInput" value="Brian Otieno" class="settings-input" />
+            <input type="text" id="nameInput" value="M-PESA User" class="settings-input" />
           </div>
 
           <div class="settings-item">
             <div class="settings-meta">
-              <span class="material-icons-round">contrast</span>
+              <span class="sun-moon-pair">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              </span>
               <div>
                 <strong>Dark Theme</strong>
                 <p>Material You dark mode</p>
@@ -218,7 +237,21 @@
 
           <div class="settings-item">
             <div class="settings-meta">
-              <span class="material-icons-round">download</span>
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>
+              <div>
+                <strong>Sync SMS Inbox</strong>
+                <p>Import M-PESA messages from your SMS inbox</p>
+              </div>
+            </div>
+            <button class="btn btn-sm btn-primary" id="syncInboxBtn">
+              <svg class="ic ic-sm" id="syncInboxIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 3v5h-5"/><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M3 21v-5h5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/></svg>
+              <span id="syncInboxLabel">Sync</span>
+            </button>
+          </div>
+
+          <div class="settings-item">
+            <div class="settings-meta">
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
               <div>
                 <strong>Export CSV</strong>
                 <p>Save all transactions locally</p>
@@ -229,43 +262,112 @@
 
           <div class="settings-item">
             <div class="settings-meta">
-              <span class="material-icons-round">restart_alt</span>
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/></svg>
               <div>
-                <strong>Reset Demo Data</strong>
-                <p>Restore the screenshot transactions</p>
+                <strong>Clear All Data</strong>
+                <p>Delete every tracked transaction</p>
               </div>
             </div>
-            <button class="btn btn-sm btn-danger" id="resetDataBtn">Reset</button>
+            <button class="btn btn-sm btn-danger" id="clearDataBtn">Clear</button>
+          </div>
+
+          <div class="settings-item">
+            <div class="settings-meta">
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+              <div>
+                <strong>App Version</strong>
+                <p>M-PESA Tracker</p>
+              </div>
+            </div>
+            <span class="version-pill">v2.0.0</span>
           </div>
 
           <div class="privacy-banner">
-            <span class="material-icons-round">lock</span>
-            <p><strong>100% Offline:</strong> No network calls are made. This APK declares no Internet permission. Your SMS financial records remain strictly in your device's private sandbox.</p>
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <p><strong>100% Offline:</strong> This APK declares no Internet permission and loads no remote fonts or assets. Your SMS financial records remain strictly in your device's private sandbox.</p>
           </div>
         </div>
       </section>
 
     </main>
 
-    <!-- Bottom Dock Navigation Bar (Matches the screenshot exactly) -->
+    <!-- Bottom Dock Navigation Bar -->
     <nav class="dock" id="bottomDock" aria-label="App Navigation">
       <button class="dock-item is-active" data-tab="view-dashboard" aria-label="Dashboard" title="Dashboard">
-        <span class="material-icons-round">dashboard</span>
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
       </button>
       <button class="dock-item" data-tab="view-analytics" aria-label="Analytics" title="Analytics">
-        <span class="material-icons-round">pie_chart</span>
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
       </button>
       <button class="dock-item dock-item--add" data-tab="view-add" aria-label="Add or Parse SMS" title="Add / Parse SMS">
-        <span class="material-icons-round">add</span>
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
       </button>
       <button class="dock-item" data-tab="view-categories" aria-label="Categories" title="Categories">
-        <span class="material-icons-round">category</span>
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.42 0l8.58-8.58a1 1 0 0 0 0-1.42z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/></svg>
       </button>
       <button class="dock-item" data-tab="view-settings" aria-label="Settings" title="Settings">
-        <span class="material-icons-round">settings</span>
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
     </nav>
 
+  </div>
+
+  <!-- First-run SMS Permission Modal -->
+  <div class="modal-backdrop" id="permModal" role="dialog" aria-modal="true" aria-labelledby="permModalTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon-badge">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="m9 10 2 2 4-4"/></svg>
+        </div>
+        <div>
+          <h3 id="permModalTitle">Enable SMS tracking</h3>
+          <p>Auto-capture M-PESA confirmations</p>
+        </div>
+      </div>
+      <div class="modal-body">
+        <p>M-PESA Tracker reads only M-PESA confirmation SMS so it can build your private spending ledger automatically.</p>
+        <ul class="modal-security-points">
+          <li>
+            <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+            Only messages from the M-PESA sender are processed
+          </li>
+          <li>
+            <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+            Everything stays on this device — no Internet permission
+          </li>
+          <li>
+            <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+            New M-PESA SMS are tracked live, even in the background
+          </li>
+        </ul>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-block" id="grantPermBtn">
+          <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          Grant SMS Permission
+        </button>
+        <button class="btn btn-ghost btn-block" id="permModalClose">Not now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category Editor Modal -->
+  <div class="modal-backdrop" id="categoryModal" role="dialog" aria-modal="true" aria-labelledby="categoryModalTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon-badge">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.42 0l8.58-8.58a1 1 0 0 0 0-1.42z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/></svg>
+        </div>
+        <div>
+          <h3 id="categoryModalTitle">Change category</h3>
+          <p id="modalTxName"></p>
+        </div>
+      </div>
+      <div class="cat-options-grid" id="modalCatOptions"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost btn-block" id="modalCloseBtn">Cancel</button>
+      </div>
+    </div>
   </div>
 
   <!-- Toast Notification Container -->

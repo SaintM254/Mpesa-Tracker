@@ -2,26 +2,52 @@
   'use strict';
 
   // ========================================================
-  // M-PESA TRACKER — OFFLINE M-PESA SMS EXPENSE ENGINE
+  // M-PESA TRACKER v2.0.0 — OFFLINE M-PESA SMS EXPENSE ENGINE
+  // Zero-mock: the app always starts on a clean, empty ledger.
   // ========================================================
 
-  const STORAGE_KEY_TX = 'mpesa_tracker_tx_db_v3';
+  const STORAGE_KEY_TX = 'mpesa_tracker_tx_db_v4'; // fresh namespace: no legacy mock data
   const STORAGE_KEY_THEME = 'mpesa_tracker_theme';
   const STORAGE_KEY_USER = 'mpesa_tracker_user_name';
   const STORAGE_KEY_RULES = 'mpesa_tracker_cat_rules';
   const STORAGE_KEY_PERM_DISMISSED = 'mpesa_tracker_perm_dismissed';
 
-  // Available Categories (Solid rounded Material Icons Round)
+  const DEFAULT_USER_NAME = 'M-PESA User';
+
+  // ========================================================
+  // INLINE SVG ICON SYSTEM (no webfont — crisp vectors, zero text bleed)
+  // ========================================================
+  const ICON_PATHS = {
+    food: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/>',
+    transport: '<rect x="4" y="3" width="16" height="13" rx="2.5"/><path d="M4 10h16"/><path d="M7 16v3"/><path d="M17 16v3"/><path d="M8 13h.01"/><path d="M16 13h.01"/>',
+    airtime: '<rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/>',
+    utilities: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
+    shopping: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+    rent: '<path d="M3 9.5 12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22v-8h6v8"/>',
+    savings: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+    income: '<circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12l4 4 4-4"/>',
+    needs_review: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+    tag: '<path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.42 0l8.58-8.58a1 1 0 0 0 0-1.42z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/>',
+    trending_up: '<path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>',
+    trending_down: '<path d="m22 17-8.5-8.5-5 5L2 7"/><path d="M16 17h6v-6"/>'
+  };
+
+  function icon(name, extraClass) {
+    const paths = ICON_PATHS[name] || ICON_PATHS.needs_review;
+    return '<svg class="ic' + (extraClass ? ' ' + extraClass : '') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths + '</svg>';
+  }
+
+  // Available Categories (inline SVG glyph keys)
   const CATEGORIES = {
-    food:          { key: 'food',          name: 'Food & drinks',   icon: 'restaurant',     class: 'tx-icon--food',       color: '#ef6c00' },
-    transport:     { key: 'transport',     name: 'Transport',       icon: 'directions_bus', class: 'tx-icon--transport',  color: '#1e88e5' },
-    airtime:       { key: 'airtime',       name: 'Airtime',         icon: 'phone_android',  class: 'tx-icon--airtime',    color: '#8e24aa' },
-    utilities:     { key: 'utilities',     name: 'Utilities',       icon: 'bolt',           class: 'tx-icon--utilities',  color: '#fbc02d' },
-    shopping:      { key: 'shopping',      name: 'Shopping',        icon: 'shopping_bag',   class: 'tx-icon--shopping',   color: '#d81b60' },
-    rent:          { key: 'rent',          name: 'Rent & housing',  icon: 'home',           class: 'tx-icon--rent',       color: '#00897b' },
-    savings:       { key: 'savings',       name: 'Savings',         icon: 'savings',        class: 'tx-icon--savings',    color: '#3949ab' },
-    income:        { key: 'income',        name: 'Income',          icon: 'arrow_downward', class: 'tx-icon--received',   color: '#2e7d32' },
-    needs_review:  { key: 'needs_review',  name: 'Needs review',    icon: 'help_outline',   class: 'tx-icon--review',     color: '#78909c' }
+    food:          { key: 'food',         name: 'Food & drinks',  icon: 'food',         class: 'tx-icon--food',      color: '#ef6c00' },
+    transport:     { key: 'transport',    name: 'Transport',      icon: 'transport',    class: 'tx-icon--transport', color: '#1e88e5' },
+    airtime:       { key: 'airtime',      name: 'Airtime',        icon: 'airtime',      class: 'tx-icon--airtime',   color: '#8e24aa' },
+    utilities:     { key: 'utilities',    name: 'Utilities',      icon: 'utilities',    class: 'tx-icon--utilities', color: '#fbc02d' },
+    shopping:      { key: 'shopping',     name: 'Shopping',       icon: 'shopping',     class: 'tx-icon--shopping',  color: '#d81b60' },
+    rent:          { key: 'rent',         name: 'Rent & housing', icon: 'rent',         class: 'tx-icon--rent',      color: '#00897b' },
+    savings:       { key: 'savings',      name: 'Savings',        icon: 'savings',      class: 'tx-icon--savings',   color: '#3949ab' },
+    income:        { key: 'income',       name: 'Income',         icon: 'income',       class: 'tx-icon--received',  color: '#2e7d32' },
+    needs_review:  { key: 'needs_review', name: 'Needs review',   icon: 'needs_review', class: 'tx-icon--review',    color: '#78909c' }
   };
 
   // Default initial rules for category guessing based on counterparty / keyword
@@ -37,79 +63,11 @@
     'SAVINGS': 'savings', 'MSHWARI': 'savings', 'KCB': 'savings', 'LOCK': 'savings'
   };
 
-  // Seed sample transactions if DB is completely fresh
-  const SEED_TRANSACTIONS = [
-    {
-      code: 'UHK1A2B3C1',
-      amount: 850,
-      type: 'sent',
-      category: 'food',
-      counterparty: 'Java House — Westlands',
-      datetime: 'Today 12:42 PM',
-      timestamp: Date.now() - (2 * 3600 * 1000),
-      balance: 4120,
-      cost: 0
-    },
-    {
-      code: 'UHK1A2B3C2',
-      amount: 100,
-      type: 'sent',
-      category: 'transport',
-      counterparty: 'Matatu · Kenyatta Ave',
-      datetime: 'Today 08:15 AM',
-      timestamp: Date.now() - (6 * 3600 * 1000),
-      balance: 4970,
-      cost: 0
-    },
-    {
-      code: 'UHK1A2B3C3',
-      amount: 200,
-      type: 'airtime',
-      category: 'airtime',
-      counterparty: 'Safaricom airtime',
-      datetime: 'Yesterday 19:08',
-      timestamp: Date.now() - (24 * 3600 * 1000),
-      balance: 5070,
-      cost: 0
-    },
-    {
-      code: 'UHK1A2B3C4',
-      amount: 45000,
-      type: 'received',
-      category: 'income',
-      counterparty: 'Salary — Acme Ltd',
-      datetime: 'Yesterday 09:01',
-      timestamp: Date.now() - (30 * 3600 * 1000),
-      balance: 5270,
-      cost: 0
-    },
-    {
-      code: 'UHK1A2B3C5',
-      amount: 1500,
-      type: 'sent',
-      category: 'utilities',
-      counterparty: 'KPLC prepaid tokens',
-      datetime: '02 Sep 16:20',
-      timestamp: Date.now() - (5 * 86400 * 1000),
-      balance: 38270,
-      cost: 23
-    },
-    {
-      code: 'UHK1A2B3C6',
-      amount: 3450,
-      type: 'sent',
-      category: 'shopping',
-      counterparty: 'Naivas Supermarket',
-      datetime: '01 Sep 14:10',
-      timestamp: Date.now() - (7 * 86400 * 1000),
-      balance: 39770,
-      cost: 0
-    }
-  ];
-
-  // In-Memory App State
+  // In-Memory App State — always starts empty unless the user's own data exists
   let db = [];
   let userCategoryRules = {};
+  let inboxScanInProgress = false;
+  let liveSmsListenerAttached = false;
 
   // ========================================================
   // PERSISTENCE & LOCAL DATABASE (Indexed by code for deduplication)
@@ -118,13 +76,13 @@
     try {
       const stored = localStorage.getItem(STORAGE_KEY_TX);
       if (stored) {
-        db = JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        db = Array.isArray(parsed) ? parsed : [];
       } else {
-        db = [...SEED_TRANSACTIONS];
-        saveDatabase();
+        db = [];
       }
     } catch (_) {
-      db = [...SEED_TRANSACTIONS];
+      db = [];
     }
 
     try {
@@ -361,7 +319,8 @@
 
   async function scanMpesaInbox() {
     const plugin = getSmsPlugin();
-    if (!plugin) return 0;
+    if (!plugin || inboxScanInProgress) return 0;
+    inboxScanInProgress = true;
     try {
       const res = await plugin.readMpesaInbox({ limit: 500 });
       if (res && res.messages && Array.isArray(res.messages)) {
@@ -378,11 +337,14 @@
       }
     } catch (e) {
       // Never write message content to logs
+    } finally {
+      inboxScanInProgress = false;
     }
     return 0;
   }
 
   function listenForLiveSms() {
+    if (liveSmsListenerAttached) return;
     const plugin = getSmsPlugin();
     if (!plugin || !plugin.addListener) return;
     try {
@@ -398,7 +360,17 @@
           }
         }
       });
+      liveSmsListenerAttached = true;
     } catch (_) {}
+  }
+
+  // Silent startup sync: import anything received while the app was closed
+  async function autoSyncOnStartup() {
+    const count = await scanMpesaInbox();
+    if (count > 0) {
+      renderAllViews();
+      showToast(`Synced ${count} new M-PESA transaction${count === 1 ? '' : 's'} from your inbox.`);
+    }
   }
 
   // ========================================================
@@ -410,10 +382,9 @@
     renderCategoriesGrid();
   }
 
-  function renderDashboard() {
+  function totals() {
     let totalExpense = 0;
     let totalIncome = 0;
-
     db.forEach(t => {
       if (t.type === 'received') {
         totalIncome += Number(t.amount || 0);
@@ -421,15 +392,28 @@
         totalExpense += Number(t.amount || 0);
       }
     });
+    return { totalExpense, totalIncome, net: totalIncome - totalExpense };
+  }
 
-    const net = totalIncome - totalExpense;
+  function renderDashboard() {
+    const { totalExpense, totalIncome, net } = totals();
 
     // Balance Card
     const totalSpentEl = document.getElementById('dashTotalSpent');
     if (totalSpentEl) totalSpentEl.innerHTML = `KSh <span>${formatKsh(totalExpense)}</span>`;
 
+    const monthName = new Date().toLocaleDateString('en-GB', { month: 'long' });
+    const monthLabel = document.getElementById('dashMonthLabel');
+    if (monthLabel) monthLabel.textContent = `Total spent · ${monthName}`;
+
     const netEl = document.getElementById('dashNetTotal');
     if (netEl) netEl.textContent = `Net: ${net >= 0 ? '+' : '−'}KSh ${formatKsh(Math.abs(net))}`;
+
+    // Trend chip: this month vs last month (only shown with real data)
+    renderTrendChip();
+
+    // Weekly bars from real daily expenses (last 7 days)
+    renderWeeklyBars();
 
     // Mini Stats
     const miniIncome = document.getElementById('miniIncome');
@@ -439,7 +423,7 @@
     if (miniExpenses) miniExpenses.textContent = `−KSh ${formatKsh(totalExpense)}`;
 
     const miniCount = document.getElementById('miniCount');
-    if (miniCount) miniCount.textContent = `${db.length} items`;
+    if (miniCount) miniCount.textContent = `${db.length} item${db.length === 1 ? '' : 's'}`;
 
     // Transaction List
     const listEl = document.getElementById('dashboardTxList');
@@ -448,7 +432,7 @@
 
     const recents = db.slice(0, 15);
     if (!recents.length) {
-      listEl.innerHTML = '<li class="empty-state">No M-PESA transactions found. Scan your inbox or paste an SMS.</li>';
+      listEl.innerHTML = '<li class="empty-state">No M-PESA transactions yet. Grant SMS access or use Settings → Sync SMS Inbox.</li>';
       return;
     }
 
@@ -462,7 +446,7 @@
       li.className = 'tx';
       li.innerHTML = `
         <div class="tx-icon ${cat.class}">
-          <span class="material-icons-round">${cat.icon}</span>
+          ${icon(cat.icon)}
         </div>
         <div class="tx-body">
           <p class="tx-title">${escapeHtml(tx.counterparty)}</p>
@@ -477,21 +461,98 @@
     });
   }
 
+  function renderTrendChip() {
+    const trendEl = document.getElementById('dashTrend');
+    if (!trendEl) return;
+
+    const now = new Date();
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+
+    let thisMonth = 0;
+    let lastMonth = 0;
+    db.forEach(t => {
+      if (t.type === 'received') return;
+      const ts = Number(t.timestamp || 0);
+      const amt = Number(t.amount || 0);
+      if (ts >= thisMonthStart) thisMonth += amt;
+      else if (ts >= lastMonthStart) lastMonth += amt;
+    });
+
+    // Hide in a zero-mock state (nothing to compare yet)
+    if (thisMonth === 0 && lastMonth === 0) {
+      trendEl.style.display = 'none';
+      return;
+    }
+
+    const lastMonthName = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      .toLocaleDateString('en-GB', { month: 'short' });
+
+    let chip;
+    if (lastMonth === 0) {
+      chip = `${icon('trending_up', 'ic-xs')}<span>new this month</span>`;
+    } else {
+      const pct = Math.round(((thisMonth - lastMonth) / lastMonth) * 100);
+      const up = pct >= 0;
+      chip = `${icon(up ? 'trending_up' : 'trending_down', 'ic-xs')}<span>${up ? '+' : ''}${pct}% vs ${lastMonthName}</span>`;
+    }
+    trendEl.innerHTML = chip;
+    trendEl.style.display = 'inline-flex';
+  }
+
+  function renderWeeklyBars() {
+    const barsEl = document.getElementById('weeklyBars');
+    if (!barsEl) return;
+
+    // Build the last 7 days ending today
+    const days = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      days.push({
+        label: d.toLocaleDateString('en-GB', { weekday: 'short' }),
+        start: d.getTime(),
+        end: d.getTime() + 86400000,
+        total: 0
+      });
+    }
+
+    db.forEach(t => {
+      if (t.type === 'received') return;
+      const ts = Number(t.timestamp || 0);
+      const amt = Number(t.amount || 0);
+      for (const day of days) {
+        if (ts >= day.start && ts < day.end) {
+          day.total += amt;
+          break;
+        }
+      }
+    });
+
+    const maxTotal = Math.max(...days.map(d => d.total), 0);
+    barsEl.innerHTML = '';
+    days.forEach(day => {
+      const span = document.createElement('span');
+      const pct = maxTotal === 0 ? 6 : Math.max(6, Math.round((day.total / maxTotal) * 100));
+      span.style.setProperty('--h', pct + '%');
+      span.title = `${day.label}: KSh ${formatKsh(day.total)}`;
+      barsEl.appendChild(span);
+    });
+  }
+
   function renderAnalytics() {
-    let totalExpense = 0;
-    let totalIncome = 0;
+    const { totalExpense, totalIncome, net } = totals();
     const catTotals = {};
 
     db.forEach(t => {
-      if (t.type === 'received') {
-        totalIncome += Number(t.amount || 0);
-      } else {
-        totalExpense += Number(t.amount || 0);
+      if (t.type !== 'received') {
         catTotals[t.category] = (catTotals[t.category] || 0) + Number(t.amount || 0);
       }
     });
 
-    const net = totalIncome - totalExpense;
+    const monthName = new Date().toLocaleDateString('en-GB', { month: 'long' });
+    const analyticsMonthLabel = document.getElementById('analyticsMonthLabel');
+    if (analyticsMonthLabel) analyticsMonthLabel.textContent = `${monthName} breakdown`;
 
     const totalEl = document.getElementById('analyticsTotal');
     if (totalEl) totalEl.textContent = `KSh ${formatKsh(totalExpense)}`;
@@ -521,7 +582,7 @@
       row.innerHTML = `
         <div class="cat-bar-header">
           <span class="cat-bar-name">
-            <span class="tx-icon ${cat.class} cat-bar-badge"><span class="material-icons-round">${cat.icon}</span></span>
+            <span class="tx-icon ${cat.class} cat-bar-badge">${icon(cat.icon, 'ic-xs')}</span>
             ${escapeHtml(cat.name)}
           </span>
           <strong class="cat-bar-amount">KSh ${formatKsh(total)}</strong>
@@ -554,7 +615,7 @@
       const card = document.createElement('div');
       card.className = 'category-card';
       card.innerHTML = `
-        <div class="tx-icon ${c.class}"><span class="material-icons-round">${c.icon}</span></div>
+        <div class="tx-icon ${c.class}">${icon(c.icon)}</div>
         <h4>${escapeHtml(c.name)}</h4>
         <p class="category-meta">${count} item${count === 1 ? '' : 's'}</p>
         <p class="category-total">KSh ${formatKsh(sum)}</p>
@@ -577,7 +638,7 @@
       const btn = document.createElement('button');
       btn.className = `cat-option-btn ${tx.category === c.key ? 'is-selected' : ''}`;
       btn.innerHTML = `
-        <span class="tx-icon ${c.class} cat-bar-badge"><span class="material-icons-round">${c.icon}</span></span>
+        <span class="tx-icon ${c.class} cat-bar-badge">${icon(c.icon, 'ic-xs')}</span>
         <span>${escapeHtml(c.name)}</span>
       `;
       btn.addEventListener('click', () => {
@@ -593,20 +654,19 @@
   }
 
   // ========================================================
-  // PERMISSION MODAL & ONBOARDING
+  // PERMISSION MODAL & FIRST-RUN ONBOARDING
   // ========================================================
   function initPermissionScreen() {
     const banner = document.getElementById('permBanner');
     const modal = document.getElementById('permModal');
     const grantBtn = document.getElementById('grantPermBtn');
-    const scanBtn = document.getElementById('scanInboxBtn');
     const bannerScanBtn = document.getElementById('bannerScanBtn');
     const bannerDismissBtn = document.getElementById('bannerDismissBtn');
     const modalCloseBtn = document.getElementById('permModalClose');
 
     const plugin = getSmsPlugin();
 
-    // Check permissions and show friendly prompt
+    // Check permissions and show the first-run popup
     async function checkAndPrompt() {
       if (!plugin) {
         if (banner) banner.style.display = 'none';
@@ -617,6 +677,7 @@
       if (!status.granted) {
         const dismissed = localStorage.getItem(STORAGE_KEY_PERM_DISMISSED);
         if (!dismissed && modal) {
+          // First run: ask up-front for SMS access
           modal.classList.add('is-open');
         } else if (banner) {
           banner.style.display = 'flex';
@@ -625,6 +686,7 @@
         if (banner) banner.style.display = 'none';
         if (modal) modal.classList.remove('is-open');
         listenForLiveSms();
+        autoSyncOnStartup();
       }
     }
 
@@ -633,11 +695,11 @@
         if (modal) modal.classList.remove('is-open');
         const granted = await requestNativeSmsPermissions();
         if (granted) {
-          showToast('SMS permission granted. Scanning M-PESA messages...');
+          showToast('SMS permission granted. Importing M-PESA messages...');
           listenForLiveSms();
           const count = await scanMpesaInbox();
           renderAllViews();
-          showToast(`Imported ${count} M-PESA transactions`);
+          showToast(`Imported ${count} M-PESA transaction${count === 1 ? '' : 's'}.`);
         } else {
           showToast('Permission not granted. You can still paste SMS messages manually.');
           if (banner) banner.style.display = 'flex';
@@ -666,25 +728,55 @@
       });
     }
 
-    if (scanBtn) {
-      scanBtn.addEventListener('click', async () => {
-        if (!plugin) {
-          showToast('SMS reading is available inside the Android APK.');
-          return;
+    checkAndPrompt();
+  }
+
+  // ========================================================
+  // SETTINGS: SYNC SMS INBOX TOOL
+  // ========================================================
+  function initInboxSync() {
+    const syncBtn = document.getElementById('syncInboxBtn');
+    const syncLabel = document.getElementById('syncInboxLabel');
+    const syncIcon = document.getElementById('syncInboxIcon');
+    const modal = document.getElementById('permModal');
+    if (!syncBtn) return;
+
+    syncBtn.addEventListener('click', async () => {
+      const plugin = getSmsPlugin();
+      if (!plugin) {
+        showToast('Inbox sync works inside the Android APK.');
+        return;
+      }
+
+      const status = await checkNativeSmsPermissions();
+      if (!status.granted) {
+        if (modal) {
+          modal.classList.add('is-open');
+        } else {
+          showToast('Grant SMS permission first.');
         }
-        const status = await checkNativeSmsPermissions();
-        if (!status.granted) {
-          if (modal) modal.classList.add('is-open');
-          return;
-        }
-        showToast('Scanning inbox for M-PESA messages...');
+        return;
+      }
+
+      // Busy state
+      syncBtn.disabled = true;
+      if (syncLabel) syncLabel.textContent = 'Syncing…';
+      if (syncIcon) syncIcon.classList.add('ic-spin');
+
+      try {
         const count = await scanMpesaInbox();
         renderAllViews();
-        showToast(`Scan complete: ${count} new M-PESA transactions imported.`);
-      });
-    }
-
-    checkAndPrompt();
+        if (count > 0) {
+          showToast(`Sync complete: ${count} new M-PESA transaction${count === 1 ? '' : 's'} imported.`);
+        } else {
+          showToast('Sync complete: ledger already up to date.');
+        }
+      } finally {
+        syncBtn.disabled = false;
+        if (syncLabel) syncLabel.textContent = 'Sync';
+        if (syncIcon) syncIcon.classList.remove('ic-spin');
+      }
+    });
   }
 
   // ========================================================
@@ -786,17 +878,27 @@
     }
   }
 
+  function timeBasedGreeting() {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning,';
+    if (h < 17) return 'Good afternoon,';
+    return 'Good evening,';
+  }
+
   function initUser() {
-    const savedName = localStorage.getItem(STORAGE_KEY_USER) || 'Brian Otieno';
+    const savedName = localStorage.getItem(STORAGE_KEY_USER) || DEFAULT_USER_NAME;
     const nameEl = document.getElementById('userGreeting');
+    const helloEl = document.getElementById('helloLine');
     const avatarEl = document.getElementById('avatarBtn');
     const inputEl = document.getElementById('nameInput');
 
+    if (helloEl) helloEl.textContent = timeBasedGreeting();
+
     function updateName(name) {
-      const safe = name.trim() || 'Brian Otieno';
+      const safe = name.trim() || DEFAULT_USER_NAME;
       if (nameEl) nameEl.textContent = safe;
       if (inputEl) inputEl.value = safe;
-      const initials = safe.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'BO';
+      const initials = safe.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'MU';
       if (avatarEl) avatarEl.textContent = initials;
       localStorage.setItem(STORAGE_KEY_USER, safe);
     }
@@ -859,16 +961,16 @@
       });
     }
 
-    const resetBtn = document.getElementById('resetDataBtn');
-    if (resetBtn) {
-      resetBtn.addEventListener('click', () => {
-        if (confirm('Reset transactions to default sample state?')) {
-          db = [...SEED_TRANSACTIONS];
+    const clearBtn = document.getElementById('clearDataBtn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        if (confirm('Permanently delete all tracked transactions and learned category rules from this device?')) {
+          db = [];
           userCategoryRules = { ...DEFAULT_RULES };
           saveDatabase();
           saveRules();
           renderAllViews();
-          showToast('Demo data restored.');
+          showToast('All transaction data cleared.');
         }
       });
     }
@@ -895,7 +997,7 @@
     }[c]));
   }
 
-  // Self-test with user-provided examples
+  // Self-test with canonical Safaricom SMS formats
   function runSelfTests() {
     const test1 = 'UHK1A2B3C4 Confirmed. Ksh500.00 sent to JOHN DOE 0712345678 on 20/9/26 at 11:50 AM. New M-PESA balance is Ksh2,000.00. Transaction cost, Ksh7.00.';
     const p1 = parseMpesaMessage(test1);
@@ -924,6 +1026,7 @@
     initTabs();
     initSmsTab();
     initSettingsActions();
+    initInboxSync();
     initPermissionScreen();
   });
 

@@ -4,17 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag (e.g. v1.1.0)"
+        description: "Release tag (e.g. v2.0.0)"
         required: true
-        default: "v1.1.0"
+        default: "v2.0.0"
       release_name:
         description: "Release display name"
         required: true
-        default: "M-PESA Tracker v1.1.0"
-      upload_release:
-        description: "Publish a GitHub release for this build?"
-        type: boolean
-        default: true
+        default: "M-PESA Tracker v2.0.0"
   push:
     branches: [main]
 
@@ -178,9 +174,8 @@ jobs:
   release:
     name: Publish GitHub Release
     needs: build
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && inputs.upload_release == 'true')
+    # A successful build ALWAYS publishes a release — never skip.
+    if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Download release artefacts
@@ -199,7 +194,7 @@ jobs:
             TAG="$INPUT_TAG"
           else
             SHA="$(echo "${{ github.sha }}" | cut -c1-7)"
-            TAG="v1.1.0+${SHA}-$(date -u +%Y%m%d-%H%M)"
+            TAG="v2.0.0+${SHA}-$(date -u +%Y%m%d-%H%M)"
           fi
           if [ -n "$INPUT_NAME" ]; then NAME="$INPUT_NAME"; else NAME="M-PESA Tracker $TAG"; fi
           echo "tag=$TAG"  >> "$GITHUB_OUTPUT"
@@ -211,24 +206,20 @@ jobs:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.name }}
           body: |
-            ## M-PESA Tracker v1.1.0 — Android APK
+            ## M-PESA Tracker v2.0.0 — Android APK
 
-            ### 🚀 New Release: Dedicated In-App Dashboard
-            This update turns the APK into the **exact interactive application displayed on the mockup**:
-            - **Header & Greeting**: Good morning, Brian Otieno with interactive profile customization.
-            - **Balance Card**: Total spent (KSh 14,820), percentage trend vs previous month, and weekly activity bar graph.
-            - **Interactive Dock Navigation**:
-              - 📊 **Dashboard**: Recent transactions (Java House Westlands, Matatu, Airtime, Salary, KPLC tokens).
-              - 📈 **Analytics**: Category spend breakdown with live progress bars (Food, Transport, Utilities, Airtime, Shopping, Rent).
-              - ➕ **SMS Parser & Simulator**: Paste any Safaricom M-PESA SMS text or test with sample confirmations to parse reference code, amount, counterparty, and auto-categorize in real-time.
-              - 🏷️ **Categories**: Color-coded category breakdown cards with count and expense sums.
-              - ⚙️ **Settings**: Material You Light / Dark theme switch, custom user profile, CSV ledger export, and demo reset.
-            - **100% Offline**: Zero internet permissions declared in `AndroidManifest.xml`. Data is securely stored in local storage on device.
+            ### 🚀 What's new in v2.0.0
+            - **Clean zero-mock start**: All demo/dummy transactions removed — the app opens on a pristine, empty ledger. A first-run SMS permission popup asks once, then immediately imports your real M-PESA history.
+            - **Crisp inline SVG icons everywhere**: The Material Icons webfont is gone (it broke icons and bled raw text when offline). Every icon — navigation dock, transaction/category tiles, sun ☀️ / moon 🌙 theme toggle, settings — is now a razor-sharp inline vector that renders identically online and offline.
+            - **Sync SMS Inbox in Settings**: One-tap tool that re-scans your SMS inbox for M-PESA messages and imports anything new (deduplicated by transaction code). The app also silently syncs on startup once permission is granted.
+            - **Branded M-PESA launcher icon**: Green M-PESA tile with the white “M” mark and coin accent across every density and adaptive icon path.
+            - **Real analytics**: Balance-card weekly chart, month trend chip, and breakdowns are computed from your actual data — no static placeholders.
+            - **100% Offline**: No internet permission, no fonts or assets fetched from the network. Your financial SMS data never leaves the device.
 
             ### Installation:
             1. Download `app-release.apk` below.
             2. Tap **Install** (allow *Install unknown apps* for your browser if prompted).
-            3. Enjoy full offline M-PESA expenditure tracking.
+            3. Grant SMS access on first launch and your M-PESA transactions appear automatically.
 
             SHA-256 checksums are in `SHA256SUMS.txt`.
           draft: false
