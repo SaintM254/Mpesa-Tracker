@@ -2073,3 +2073,40 @@ body::before { animation: none !important; will-change: auto !important; }
   .app-tab-view.is-active > * { animation: none !important; }
   .btn-loading span, .chat-typing i { animation: none !important; }
 }
+
+/* ===========================================================
+   v5.3 — Tidy toasts · interactive categories · header cleanup
+   =========================================================== */
+
+/* Toast: compact centred pill that wraps instead of stretching past the
+   screen edges (v5.1 failure messages carry real HTTP status text — they
+   must stay readable AND inside the viewport). */
+.app-toast {
+  width: max-content;
+  max-width: min(440px, calc(100vw - 48px));
+  white-space: normal;
+  text-align: center;
+  line-height: 1.4;
+  padding: 11px 18px;
+  border-radius: 18px;
+  overflow-wrap: break-word;
+}
+
+/* Categories are interactive: the whole card is tappable, tapping expands
+   the card full-width with its items; each row opens the same recategorize
+   picker used everywhere. */
+.category-card { cursor: pointer; }
+.category-hint {
+  margin: 8px 0 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+.category-card-items { display: none; margin-top: 12px; }
+.category-card.is-open { grid-column: 1 / -1; cursor: default; }
+.category-card.is-open .category-card-items { display: block; }
+.category-card.is-open .category-hint { text-transform: none; letter-spacing: 0; }
+.category-card.is-open .category-hint::after { content: ' · tap a row to change its category'; }
+.category-more { margin-top: 8px; }

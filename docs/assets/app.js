@@ -11,6 +11,10 @@
   // loading · avatar tap inert · fluid glass motion
   // v5.0: DEEP inbox paging (first-ever message, not last 500) · AMOLED
   // theme w/ AA contrast · theme control lives in Settings only
+  // v5.1: v3.1.0 interaction model restored (motion tax removed)
+  // v5.3: monthly dashboard totals · header ghost removed · Gemini
+  // rolls through 5xx/429 · counterparty-only category rules
+  // (people sends → Needs review) · interactive categories · tidy toast
   // ========================================================
 
   const STORAGE_KEY_TX = 'mpesa_tracker_tx_db_v4'; // fresh namespace: no legacy mock data
@@ -79,8 +83,8 @@
   const DEFAULT_RULES = {
     'JAVA': 'food', 'KFC': 'food', 'BURGER': 'food', 'PIZZA': 'food', 'ARTCAFFE': 'food', 'CAFE': 'food',
     'RESTAURANT': 'food', 'COFFEE': 'food', 'CHOMA': 'food', 'BAKERY': 'food', 'CHEF': 'food',
-    'MATATU': 'transport', 'KENYATTA': 'transport', 'UBER': 'transport', 'BOLT': 'transport',
-    'METRO': 'transport', 'BUS': 'transport', 'FARE': 'transport', 'TRANS': 'transport', 'TOTAL': 'transport',
+    'MATATU': 'transport', 'UBER': 'transport', 'BOLT': 'transport', 'BODA': 'transport',
+    'TAXI': 'transport', 'FARE': 'transport', 'SHELL': 'transport', 'RUBIS': 'transport', 'TOTAL': 'transport',
     'SAFARICOM AIRTIME': 'airtime', 'AIRTIME': 'airtime', 'BUNDLE': 'airtime', 'DATA': 'airtime',
     'KPLC': 'utilities', 'PREPAID': 'utilities', 'TOKENS': 'utilities', 'WATER': 'utilities', 'POWER': 'utilities',
     'NAIVAS': 'shopping', 'CARREFOUR': 'shopping', 'QUICKMART': 'shopping', 'SUPERMARKET': 'shopping', 'MALL': 'shopping',
@@ -119,9 +123,17 @@
     try {
       const storedRules = localStorage.getItem(STORAGE_KEY_RULES);
       userCategoryRules = storedRules ? JSON.parse(storedRules) : { ...DEFAULT_RULES };
+      // v5.3 cleanup: purge legacy junk tokens that mis-binned person transfers
+      const junk = ['KENYATTA', 'TRANS', 'BUS', 'METRO'];
+      if (junk.some(k => k in userCategoryRules)) {
+        junk.forEach(k => { delete userCategoryRules[k]; });
+        saveRules();
+      }
     } catch (_) {
       userCategoryRules = { ...DEFAULT_RULES };
     }
+
+    migrateLegacyTransportBias();
   }
 
   function saveDatabase() {
@@ -248,8 +260,9 @@
       counterparty = toMatch ? cleanCounterparty(toMatch[1]) : 'M-PESA Payment';
     }
 
-    // 7. Auto-categorize based on rules
-    if (type !== 'received') {
+    // 7. Auto-categorize based on rules (only fresh "sent" payments get
+    //    guessed — received/airtime/withdraw/fees keep preset buckets)
+    if (type === 'sent') {
       category = guessCategory(counterparty, body);
     }
 
@@ -275,27 +288,62 @@
               .trim() || 'M-PESA Merchant';
   }
 
+  // Person-shaped counterparty? (two or more plain words, letters only,
+  // no digits, no business suffixes) — gates the "Needs review" bucket.
+  function isPersonName(cp) {
+    const s = (cp || '').trim();
+    if (s.length < 5 || /\d/.test(s)) return false;
+    if (/\bM-PESA\b/i.test(s)) return false;
+    if (!/^[A-Za-z.'\- ]+$/.test(s)) return false;
+    if (s.split(/\s+/).length < 2) return false;
+    if (/(BANK|SACCO|LIMITED|\bLTD\b|ENTERPRISES?|COMPANY|SCHOOL|CHURCH|CLINIC|HOSPITAL|HOTEL|SUPPLIERS?|AGENT)/i.test(s)) return false;
+    return true;
+  }
+
   function guessCategory(counterparty, fullBody) {
     const cpUpper = (counterparty || '').toUpperCase();
-    const bodyUpper = (fullBody || '').toUpperCase();
 
-    // Check user-remembered rules first
+    // 1) Rules the user taught us (recategorizing a row remembers the merchant)
     for (const [key, cat] of Object.entries(userCategoryRules)) {
       if (cpUpper.includes(key.toUpperCase())) {
         return cat;
       }
     }
 
-    // Built-in keyword fallbacks
-    if (/JAVA|KFC|BURGER|PIZZA|ARTCAFFE|CAFE|RESTAURANT|CHOMA|COFFEE|BAKERY|FOOD|GRILL/i.test(bodyUpper)) return 'food';
-    if (/MATATU|KENYATTA|UBER|BOLT|SUPER METRO|TRANS|BUS|FARE/i.test(bodyUpper)) return 'transport';
-    if (/KPLC|POWER|TOKENS|WATER|ELECTRIC/i.test(bodyUpper)) return 'utilities';
-    if (/SAFARICOM|AIRTIME|BUNDLE|DATA/i.test(bodyUpper)) return 'airtime';
-    if (/NAIVAS|CARREFOUR|QUICKMART|SUPERMARKET|MALL|MART|STORE/i.test(bodyUpper)) return 'shopping';
-    if (/RENT|LANDLORD|APARTMENT|HOUSING|ESTATE/i.test(bodyUpper)) return 'rent';
-    if (/SAVINGS|MSHWARI|KCB|LOCK/i.test(bodyUpper)) return 'savings';
+    // 2) Built-in merchant keywords — matched against the COUNTERPARTY ONLY.
+    //    v4 scanned the WHOLE SMS body: every send says "transferred", so the
+    //    loose tokens TRANS / KENYATTA / BUS pinned almost every person-to-person
+    //    payment to Transport. Word-boundary tokens from here on.
+    if (/JAVA|KFC|BURGER|PIZZA|ARTCAFFE|\bCAFE\b|RESTAURANT|CHOMA|COFFEE|BAKERY|GRILL|EATERY/i.test(cpUpper)) return 'food';
+    if (/MATATU|UBER|BOLT|SUPER METRO|\bFARE\b|\bTAXI\b|\bBODA\b|SHELL|RUBIS|\bTOTAL\b|\bFUEL\b|\bPETROL\b/i.test(cpUpper)) return 'transport';
+    if (/KPLC|\bPOWER\b|TOKENS|\bWATER\b|ELECTRIC|DSTV|GOTV|ZUKU|\bWIFI\b|\bINTERNET\b/i.test(cpUpper)) return 'utilities';
+    if (/SAFARICOM|AIRTIME|\bBUNDLE\b|\bCHARGES?\b/i.test(cpUpper)) return 'airtime';
+    if (/NAIVAS|CARREFOUR|QUICKMART|SUPERMARKET|\bMALL\b|\bMART\b|\bSTORE\b|\bMARKET\b/i.test(cpUpper)) return 'shopping';
+    if (/\bRENT\b|LANDLORD|APARTMENT|HOUSING|\bESTATE\b/i.test(cpUpper)) return 'rent';
+    if (/SAVINGS|MSHWARI|\bKCB\b|\bLOCK\b|\bCHAMA\b/i.test(cpUpper)) return 'savings';
 
-    return 'shopping';
+    // 3) Never blind-guess: unknown merchants and ALL person-to-person
+    //    payments land in Needs review — tap any row to set it, and the
+    //    app learns that counterparty for next time.
+    return 'needs_review';
+  }
+
+  // v5.3 one-time migration: undo the Transport bias baked into rows the old
+  // body-scanning regex mis-binned (person-shaped rows only, nothing else).
+  function migrateLegacyTransportBias() {
+    try {
+      if (localStorage.getItem('mpesa_tracker_mig_v53')) return 0;
+      let changed = 0;
+      db.forEach(t => {
+        if (t.category !== 'transport' || !isPersonName(t.counterparty)) return;
+        if (guessCategory(t.counterparty, '') !== 'needs_review') return;
+        t.category = 'needs_review';
+        changed++;
+      });
+      localStorage.setItem('mpesa_tracker_mig_v53', '1');
+      if (changed) saveDatabase();
+      return changed;
+    } catch (_) { return 0; }
   }
 
   function updateCategoryForTransaction(code, newCat) {
@@ -304,9 +352,14 @@
     tx.category = newCat;
     saveDatabase();
 
-    // Remember choice for this counterparty for future messages
+    // Remember choice for this counterparty for future messages.
+    // People (multi-word names) are remembered by FULL name so one
+    // person's rule never bleeds onto every namesake.
     if (tx.counterparty && tx.counterparty !== 'M-PESA Merchant') {
-      const keyword = tx.counterparty.split(' ')[0].toUpperCase();
+      const trimmed = tx.counterparty.trim();
+      const keyword = (trimmed.split(/\s+/).length >= 2 && !/\d/.test(trimmed))
+        ? trimmed.toUpperCase()
+        : trimmed.split(/\s+/)[0].toUpperCase();
       if (keyword.length >= 3) {
         userCategoryRules[keyword] = newCat;
         saveRules();
@@ -490,8 +543,26 @@
     return { totalExpense, totalIncome, net: totalIncome - totalExpense };
   }
 
+  // v5.3: dashboard headline numbers are THIS MONTH ONLY. Deep history
+  // still lives in All Transactions, CSV exports and AI features.
+  function monthTotals() {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    let totalExpense = 0;
+    let totalIncome = 0;
+    db.forEach(t => {
+      if (Number(t.timestamp || 0) < start) return;
+      if (t.type === 'received') {
+        totalIncome += Number(t.amount || 0);
+      } else {
+        totalExpense += Number(t.amount || 0);
+      }
+    });
+    return { totalExpense, totalIncome, net: totalIncome - totalExpense };
+  }
+
   function renderDashboard() {
-    const { totalExpense, totalIncome, net } = totals();
+    const { totalExpense, totalIncome, net } = monthTotals();
 
     // Balance Card
     const totalSpentEl = document.getElementById('dashTotalSpent');
@@ -635,11 +706,13 @@
   }
 
   function renderAnalytics() {
-    const { totalExpense, totalIncome, net } = totals();
+    const { totalExpense, totalIncome, net } = monthTotals();
     const catTotals = {};
 
+    const now = new Date();
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
     db.forEach(t => {
-      if (t.type !== 'received') {
+      if (t.type !== 'received' && Number(t.timestamp || 0) >= thisMonthStart) {
         catTotals[t.category] = (catTotals[t.category] || 0) + Number(t.amount || 0);
       }
     });
@@ -706,14 +779,40 @@
       const count = items.length;
       const sum = items.reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
+      // v5.3: every category card is interactive — tap to expand its items,
+      // tap any row inside to recategorize it (same picker as everywhere).
       const card = document.createElement('div');
       card.className = 'category-card';
+      card.setAttribute('role', 'button');
       card.innerHTML = `
         <div class="tx-icon ${c.class}">${icon(c.icon)}</div>
         <h4>${escapeHtml(c.name)}</h4>
         <p class="category-meta">${count} item${count === 1 ? '' : 's'}</p>
         <p class="category-total">KSh ${formatKsh(sum)}</p>
+        <p class="category-hint">${count ? 'Tap to review' : 'No items yet'}</p>
       `;
+
+      if (count) {
+        const bodyEl = document.createElement('div');
+        bodyEl.className = 'category-card-items';
+        const ul = document.createElement('ul');
+        ul.className = 'tx-list tx-list--plain';
+        items.slice(0, 40).forEach(tx => ul.appendChild(buildTxRow(tx)));
+        bodyEl.appendChild(ul);
+        if (count > 40) {
+          const more = document.createElement('p');
+          more.className = 'category-meta category-more';
+          more.textContent = `\u2026and ${count - 40} more (see All Transactions)`;
+          bodyEl.appendChild(more);
+        }
+        card.appendChild(bodyEl);
+
+        card.addEventListener('click', e => {
+          // Row taps open the picker via buildTxRow; bare card taps toggle
+          if (e.target.closest('.tx')) return;
+          card.classList.toggle('is-open');
+        });
+      }
       grid.appendChild(card);
     });
   }
@@ -1223,8 +1322,10 @@
     return { status: resp.status, message, raw };
   }
 
-  // One gateway for every Gemini call: dynamic model fallback on 404,
-  // precise error capture, hard timeout — and it never throws.
+  // One gateway for every Gemini call: dynamic model fallback on ANY
+  // retryable failure — retired (404), overloaded (5xx) or rate-limited
+  // (429) models roll seamlessly to a healthier one. v4's "only roll on
+  // 404" behaviour is what hard-failed every AI feature with HTTP 503.
   async function callGemini(prompt, opts) {
     // Offline-first guardrails: feature flag + connectivity check up front
     if (!isGeminiEnabled()) return { ok: false, reason: 'no-key' };
@@ -1233,8 +1334,9 @@
     const key = getGeminiKey();
     const cfg = Object.assign({ temperature: 0.2, maxOutputTokens: 4096 }, opts || {});
     let lastHttpError = null;
+    let sawQuota = false;
 
-    for (const model of GEMINI_MODELS) {
+    async function tryModel(model) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), cfg.timeout || GEMINI_TIMEOUT_MS);
       try {
@@ -1255,9 +1357,12 @@
         if (!resp.ok) {
           const err = await readGeminiErrorBody(resp);
           console.warn(`[Gemini] ${model} -> HTTP ${err.status}: ${err.message}`);
-          if (err.status === 404) { lastHttpError = err; continue; } // retired model: clean fallback
           if (err.status === 400 || err.status === 403) return { ok: false, reason: 'bad-key', status: err.status };
-          if (err.status === 429) return { ok: false, reason: 'quota', status: err.status };
+          if (err.status === 429) sawQuota = true;
+          if (err.status === 404 || err.status === 429 || err.status >= 500) {
+            lastHttpError = err;
+            return { ok: false, reason: 'roll' };
+          }
           return { ok: false, reason: 'http', status: err.status, detail: err.message };
         }
 
@@ -1273,7 +1378,25 @@
       }
     }
 
-    return { ok: false, reason: 'model-404', status: 404, detail: lastHttpError ? lastHttpError.message : '' };
+    for (const model of GEMINI_MODELS) {
+      const res = await tryModel(model);
+      if (res.reason !== 'roll') return res;
+    }
+
+    // Every model rolled off. Transient Google 503s usually clear within a
+    // second, so give the primary model one final shot before giving up.
+    if (lastHttpError && lastHttpError.status >= 500) {
+      await new Promise(r => setTimeout(r, 900));
+      const retry = await tryModel(GEMINI_MODELS[0]);
+      if (retry.reason !== 'roll') return retry;
+    }
+
+    if (lastHttpError) {
+      const reason = lastHttpError.status === 404 ? 'model-404'
+        : (sawQuota && lastHttpError.status === 429 ? 'quota' : 'http');
+      return { ok: false, reason, status: lastHttpError.status, detail: lastHttpError.message };
+    }
+    return { ok: false, reason: 'model-404', status: 404, detail: '' };
   }
 
   // Honest, specific failure toasts — never the misleading
@@ -1543,9 +1666,19 @@
       if (res.ok) {
         thinking.innerHTML = escapeHtml(res.text).replace(/\n/g, '<br>');
       } else {
-        thinking.textContent = 'Gemini AI feature failed. Local features remain unaffected.';
+        // Feedback stays INSIDE the conversation — no stretched screen-wide
+        // popup — and the exact cause is still stated honestly.
+        const why = res.status ? `Google returned HTTP ${res.status}` : ({
+          'no-key': 'no Gemini key is set',
+          offline: 'you are offline',
+          timeout: 'the request timed out',
+          network: 'the connection dropped',
+          quota: "today's free quota is exhausted",
+          'model-404': 'the model lineup shifted again',
+          empty: 'Gemini sent back an empty reply'
+        }[res.reason] || 'a temporary glitch');
+        thinking.textContent = `I couldn't reach Gemini just now (${why}). Your data never left this device — ask again in a moment.`;
         thinking.classList.add('chat-bubble--error');
-        toastGeminiFailure(res);
       }
     }
 

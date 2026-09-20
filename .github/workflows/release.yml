@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag (e.g. v5.1)"
+        description: "Release tag (e.g. v5.3)"
         required: true
-        default: "v5.1"
+        default: "v5.3"
       release_name:
         description: "Release display name"
         required: true
-        default: "M-PESA Tracker v5.1"
+        default: "M-PESA Tracker v5.3"
   push:
     branches: [main, 'arena/**']
 
@@ -219,19 +219,16 @@ jobs:
           # the tag silently lands on the default branch's HEAD instead.
           target_commitish: ${{ github.sha }}
           body: |
-            ## M-PESA Tracker v5.1 — Android APK
+            ## M-PESA Tracker v5.3 — Android APK
 
-            ### ⚡ One job: restore the v3.1.0 interaction feel
-            Your touches queued then snapped because v4.4 stacked motion effects (whole-view enter animations, press-scales, dock pops) on top of a glass UI that — thanks to your request to deep-scan — now renders **hundreds of frosted rows**. Every tap forced the entire blurred stack to re-composite before the app could respond.
+            ### 🎯 Five direct fixes from your report
+            1. **Dashboard "Total spent" is now THIS MONTH only.** Deep sync pulled years of history into the headline number — the dashboard now sums the current calendar month (analytics breakdown follows the same month scope). Full history stays in All Transactions, CSV exports and AI.
+            2. **Ghost "M-PESA User" text removed.** A mangled header had a duplicated greeting element (invalid duplicate ID) stuck in the top-middle. Header is now: your name left, profile avatar right — nothing else.
+            3. **AI actually works now.** The old chain only rolled to the next model on HTTP 404 — a single Google 503 (overload / deprecation) killed every feature instantly. Gemini now rolls through 404, 429 AND 5xx across the live model lineup, with a final retry of the primary model, and failure feedback stays inside the chat instead of shouting a screen-wide popup.
+            4. **Stretched toast fixed.** Failure messages carry real HTTP status text, and the old toast was set `nowrap` with no max-width — it clipped off both screen edges. Toasts are now compact centred pills that wrap neatly.
+            5. **Person payments no longer bin as Transport.** v4 regex-matched the whole SMS body: every send says "transferred", so `TRANS`/`KENYATTA` pinned people to Transport. Rules now match the counterparty only, unmatched merchants and ALL person-to-person payments land in **Needs review** (existing baited rows migrate once), and **every category card is tappable** — expand it, tap any row, reassign; the app learns that counterparty.
 
-            **v5.1 removes the entire tax:**
-            - Whole-view transition animations: **gone** — tab switch is exactly the v3.1.0 single gentle content-rise.
-            - Press-scale transforms on rows and round buttons: **gone** — back to the v3.1.0 quiet hover tint.
-            - Dock spring pop on every tab change: **gone** — quiet active-state swap.
-            - The big one: repeated surfaces (transaction groups, row lists, chat bubbles) are now **solid instead of frosted**, tuned to look the same at a glance. Glass/blur remains only on the few top-level cards (hero, summary, settings, dashboard list, dock, modals) — where one blur is cheap. Hundreds of rows no longer re-blur on every touch or scroll frame.
-            - The AI busy pulse animates the label text instead of a whole frosted button.
-
-            Everything stays (deep scan, AMOLED theme, typing-dots loader, live Gemini chain). Installs on top — pinned signature.
+            Everything from v5.0/v5.1 stays: deep inbox scan, AMOLED theme, instant v3.1.0 touch feel. Installs on top — pinned signature.
 
             SHA-256 checksums are in `SHA256SUMS.txt`.
           draft: false
