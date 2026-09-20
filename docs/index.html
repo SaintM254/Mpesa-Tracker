@@ -333,7 +333,7 @@
                 <p>M-PESA Tracker</p>
               </div>
             </div>
-            <span class="version-pill">v5.3</span>
+            <span class="version-pill">v5.4</span>
           </div>
 
           <div class="privacy-banner">
@@ -459,6 +459,23 @@
 
   <!-- Hidden profile photo picker -->
   <input type="file" id="photoInput" accept="image/*" style="display:none;" />
+
+  <!-- First-run full-history import: floating progress above everything -->
+  <div id="importProgress" class="import-progress" role="status" aria-live="polite">
+    <div class="import-progress-card">
+      <div class="import-progress-head">
+        <span class="import-progress-badge" aria-hidden="true">
+          <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+        </span>
+        <div class="import-progress-copy">
+          <strong class="import-progress-title">Setting up your ledger&#8230;</strong>
+          <p class="import-progress-sub">A one-time full scan of your M-PESA history &#8212; this only happens on first setup. After this, everything is instant.</p>
+        </div>
+      </div>
+      <div class="import-progress-track"><span class="import-progress-fill" id="importProgressFill"></span></div>
+      <p class="import-progress-count" id="importProgressCount">Scanning your inbox&#8230;</p>
+    </div>
+  </div>
 
   <!-- Toast Notification Container -->
   <div id="appToast" class="app-toast" role="alert" aria-live="polite"></div>

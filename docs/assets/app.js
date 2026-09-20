@@ -15,6 +15,9 @@
   // v5.3: monthly dashboard totals · header ghost removed · Gemini
   // rolls through 5xx/429 · counterparty-only category rules
   // (people sends → Needs review) · interactive categories · tidy toast
+  // v5.4: bulk import (1 sort + 1 save per batch — kills first-load
+  // freeze) · first-run floating progress overlay · lazy accordion
+  // bodies · render-active-view-only edits · sticky category expansion
   // ========================================================
 
   const STORAGE_KEY_TX = 'mpesa_tracker_tx_db_v4'; // fresh namespace: no legacy mock data
@@ -101,6 +104,7 @@
   // UI state (persists across re-renders & tab switches, in-memory only)
   let selectedWeekDayKey = null;      // tapped bar in the weekly chart
   const txGroupState = {};            // month/year accordion: key -> collapsed
+  let openCategoryKey = null;         // expanded category card survives re-renders (v5.4)
   const tabScroll = {};               // per-tab scroll position
   let activeTabId = 'view-dashboard';
 
@@ -159,6 +163,30 @@
     db.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     saveDatabase();
     return true;
+  }
+
+  // Bulk import path for inbox scans: Set-based dedupe, ONE sort, ONE save
+  // per batch. The old per-message insert re-sorted and rewrote the ENTIRE
+  // db to localStorage for every single SMS — on a ~900-message first
+  // setup that strangled the UI thread until the import finished, which
+  // is exactly the "app is laggy until loading completes" freeze (v5.4).
+  function insertManyTransactions(list) {
+    if (!Array.isArray(list) || !list.length) return 0;
+    const seen = new Set();
+    db.forEach(t => { if (t && t.code) seen.add(String(t.code).toUpperCase()); });
+    const fresh = [];
+    for (const tx of list) {
+      if (!tx || !tx.code) continue;
+      const k = String(tx.code).toUpperCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      fresh.push(tx);
+    }
+    if (!fresh.length) return 0;
+    db = db.concat(fresh);
+    db.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    saveDatabase();
+    return fresh.length;
   }
 
   // ========================================================
@@ -420,6 +448,37 @@
     }
   }
 
+  // ---- First-run full-history import overlay (floats above everything) ----
+  let importOverlayOn = false;
+  function showImportOverlay() {
+    const el = document.getElementById('importProgress');
+    if (!el) return;
+    importOverlayOn = true;
+    el.classList.add('is-open');
+    updateImportOverlay(0, 0);
+  }
+  function updateImportOverlay(found, pages) {
+    if (!importOverlayOn) return;
+    const countEl = document.getElementById('importProgressCount');
+    const fillEl = document.getElementById('importProgressFill');
+    if (countEl) countEl.textContent = found > 0
+      ? `${formatKsh(found)} transaction${found === 1 ? '' : 's'} found so far\u2026`
+      : 'Scanning your inbox\u2026';
+    // History length is unknown upfront — the bar advances smoothly toward
+    // 90% as pages stream in and snaps to 100% when the scan completes.
+    if (fillEl) fillEl.style.width = Math.min(90, 6 + pages * 7) + '%';
+  }
+  function finishImportOverlay() {
+    if (!importOverlayOn) return;
+    const fillEl = document.getElementById('importProgressFill');
+    if (fillEl) fillEl.style.width = '100%';
+    setTimeout(() => {
+      importOverlayOn = false;
+      const el = document.getElementById('importProgress');
+      if (el) el.classList.remove('is-open');
+    }, 400);
+  }
+
   // opts.deep=false  -> newest-page only (fast path, used at startup)
   // opts.deep=true   -> walk offset pages of the WHOLE inbox, back to the
   //                     very first M-PESA message ever received (v5.0)
@@ -430,29 +489,48 @@
     inboxScanInProgress = true;
     const deep = !!(opts && opts.deep);
     const onProgress = (opts && typeof opts.onProgress === 'function') ? opts.onProgress : null;
+    // First full population of the ledger -> floating progress card that
+    // openly says this happens on first setup only (v5.4).
+    const firstLoad = deep && db.length === 0;
+    if (firstLoad) showImportOverlay();
+    const progress = firstLoad
+      ? (n, p) => { updateImportOverlay(n, p); if (onProgress) onProgress(n, p); }
+      : onProgress;
     const PAGE = 350;
     let imported = 0;
     try {
       if (!deep) {
         const res = await plugin.readMpesaInbox({ limit: 500, offset: 0 });
         if (res && Array.isArray(res.messages)) {
-          res.messages.forEach(msg => {
+          const batch = [];
+          for (const msg of res.messages) {
             const parsed = parseMpesaMessage(msg.body, msg.timestamp);
-            if (parsed && insertTransaction(parsed)) imported++;
-          });
+            if (parsed) batch.push(parsed);
+          }
+          imported = insertManyTransactions(batch);
         }
       } else {
         // The native layer sorts the whole SMS table newest-first; hasMore
         // stays true while a page was completely full — i.e. history goes on.
+        // Parse + persist in bounded batches with micro-yields so the UI
+        // thread keeps breathing while history streams in.
         for (let offset = 0, guard = 0; guard < 300; guard++, offset += PAGE) {
           const res = await plugin.readMpesaInbox({ limit: PAGE, offset });
           if (!res || !Array.isArray(res.messages)) break;
-          res.messages.forEach(msg => {
+          const batch = [];
+          for (const msg of res.messages) {
             const parsed = parseMpesaMessage(msg.body, msg.timestamp);
-            if (parsed && insertTransaction(parsed)) imported++;
-          });
-          if (onProgress) onProgress(imported, guard + 1);
+            if (parsed) batch.push(parsed);
+            if (batch.length >= 150) {
+              imported += insertManyTransactions(batch.splice(0, batch.length));
+              if (progress) progress(imported, guard + 1);
+              await new Promise(r => setTimeout(r, 0));
+            }
+          }
+          if (batch.length) imported += insertManyTransactions(batch);
+          if (progress) progress(imported, guard + 1);
           if (!res.hasMore) break; // reached the oldest SMS in the inbox
+          await new Promise(r => setTimeout(r, 0));
         }
       }
       return imported;
@@ -461,6 +539,7 @@
       return imported;
     } finally {
       inboxScanInProgress = false;
+      if (firstLoad) finishImportOverlay();
     }
   }
 
@@ -475,7 +554,7 @@
           if (parsed) {
             const added = insertTransaction(parsed);
             if (added) {
-              renderAllViews();
+              renderActiveView();
               showToast(`New M-PESA: ${parsed.type === 'received' ? '+' : '−'}KSh ${formatKsh(parsed.amount)} (${parsed.counterparty})`);
             }
           }
@@ -497,11 +576,32 @@
   // ========================================================
   // UI RENDERING ENGINE
   // ========================================================
+  const VIEW_RENDERERS = {
+    'view-dashboard': renderDashboard,
+    'view-analytics': renderAnalytics,
+    'view-categories': renderCategoriesGrid,
+    'view-transactions': renderTransactions
+  };
+  const dirtyViews = new Set();
+
   function renderAllViews() {
     renderDashboard();
     renderAnalytics();
     renderCategoriesGrid();
     renderTransactions();
+    dirtyViews.clear();
+  }
+
+  // Light refresh for inline edits (recategorize etc.): only the VISIBLE
+  // view rebuilds now; the rest rebuild on first visit. The v4.4-era
+  // renderAllViews-here is what made every category edit jank (v5.4).
+  function renderActiveView() {
+    Object.keys(VIEW_RENDERERS).forEach(id => dirtyViews.add(id));
+    const r = VIEW_RENDERERS[activeTabId];
+    if (r) {
+      r();
+      dirtyViews.delete(activeTabId);
+    }
   }
 
   // Shared transaction row — used by Dashboard and the All Transactions screen,
@@ -784,6 +884,7 @@
       const card = document.createElement('div');
       card.className = 'category-card';
       card.setAttribute('role', 'button');
+      if (openCategoryKey === key) card.classList.add('is-open');
       card.innerHTML = `
         <div class="tx-icon ${c.class}">${icon(c.icon)}</div>
         <h4>${escapeHtml(c.name)}</h4>
@@ -810,7 +911,9 @@
         card.addEventListener('click', e => {
           // Row taps open the picker via buildTxRow; bare card taps toggle
           if (e.target.closest('.tx')) return;
-          card.classList.toggle('is-open');
+          const opening = !card.classList.contains('is-open');
+          card.classList.toggle('is-open', opening);
+          openCategoryKey = opening ? key : null;
         });
       }
       grid.appendChild(card);
@@ -869,19 +972,30 @@
         <span class="tx-group-meta" data-month-total>−KSh ${formatKsh(g.spend)} · ${g.count} item${g.count === 1 ? '' : 's'}</span>
         <svg class="ic ic-sm tx-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
       `;
+      const body = document.createElement('div');
+      body.className = 'tx-group-body';
+
+      // v5.4 lazy bodies: collapsed months carry NO row DOM at all. With
+      // years of history, building every group's rows up front was the lag
+      // behind tab switches, picker edits and post-sync renders.
+      const fillBody = () => {
+        if (body.dataset.filled) return;
+        const ul = document.createElement('ul');
+        ul.className = 'tx-list tx-list--plain';
+        g.items.forEach(tx => ul.appendChild(buildTxRow(tx)));
+        body.appendChild(ul);
+        body.dataset.filled = '1';
+      };
+
       header.addEventListener('click', () => {
         const nowCollapsed = !wrap.classList.contains('is-collapsed');
         txGroupState[key] = nowCollapsed;
+        if (!nowCollapsed) fillBody();
         wrap.classList.toggle('is-collapsed', nowCollapsed);
         header.setAttribute('aria-expanded', String(!nowCollapsed));
       });
 
-      const body = document.createElement('div');
-      body.className = 'tx-group-body';
-      const ul = document.createElement('ul');
-      ul.className = 'tx-list tx-list--plain';
-      g.items.forEach(tx => ul.appendChild(buildTxRow(tx)));
-      body.appendChild(ul);
+      if (!collapsed) fillBody();
 
       wrap.appendChild(header);
       wrap.appendChild(body);
@@ -908,9 +1022,11 @@
       `;
       btn.addEventListener('click', () => {
         updateCategoryForTransaction(tx.code, c.key);
+        // Acknowledge the tap INSTANTLY (modal closes + toast paints),
+        // then re-render just the visible view on the next frame (v5.4).
         modal.classList.remove('is-open');
-        renderAllViews();
         showToast(`Category updated to ${c.name}`);
+        requestAnimationFrame(() => { renderActiveView(); });
       });
       optionsEl.appendChild(btn);
     });
@@ -1028,7 +1144,7 @@
       // Busy state + live progress while the deep scan walks the inbox
       syncBtn.disabled = true;
       if (syncLabel) syncLabel.textContent = 'Deep scanning…';
-      if (syncIcon) syncIcon.classList.add('ic-spin');
+      // No spinning icons (house rule) — the live "N found" counter is the indicator.
 
       try {
         const count = await scanMpesaInbox({
@@ -1044,7 +1160,6 @@
       } finally {
         syncBtn.disabled = false;
         if (syncLabel) syncLabel.textContent = 'Sync';
-        if (syncIcon) syncIcon.classList.remove('ic-spin');
       }
     });
   }
@@ -1136,6 +1251,13 @@
       // …and restore it on return (new tabs start at the top)
       window.scrollTo({ top: tabScroll[targetId] || 0, behavior: 'auto' });
       activeTabId = targetId;
+
+      // First visit after data changed elsewhere -> rebuild just this view
+      if (dirtyViews.has(targetId)) {
+        const rr = VIEW_RENDERERS[targetId];
+        if (rr) rr();
+        dirtyViews.delete(targetId);
+      }
     }
     window.__switchTab = switchTab; // used by in-page shortcuts
 

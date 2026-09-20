@@ -2110,3 +2110,81 @@ body::before { animation: none !important; will-change: auto !important; }
 .category-card.is-open .category-hint { text-transform: none; letter-spacing: 0; }
 .category-card.is-open .category-hint::after { content: ' · tap a row to change its category'; }
 .category-more { margin-top: 8px; }
+
+/* ===========================================================
+   v5.4 — First-run import progress · lag surgery complete
+   =========================================================== */
+
+/* Floating first-run import progress — sits above everything (incl.
+   modals), in the app's own card/pill language; appears ONLY during the
+   one-time first-setup full-inbox scan. */
+.import-progress {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%) translateY(-18px);
+  width: min(480px, calc(100vw - 40px));
+  z-index: 1200;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .24s ease, transform .24s ease, visibility .24s;
+}
+.import-progress.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+.import-progress-card {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 20px;
+  padding: 14px 16px 12px;
+  box-shadow: var(--shadow-lg);
+}
+.import-progress-head { display: flex; gap: 10px; align-items: flex-start; }
+.import-progress-badge {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand-light), var(--brand));
+  box-shadow: var(--shadow-brand, 0 6px 14px rgba(15,123,58,.35));
+}
+.import-progress-copy { min-width: 0; }
+.import-progress-title { font-size: 13px; font-weight: 700; }
+.import-progress-sub {
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--app-muted);
+}
+.import-progress-track {
+  margin-top: 12px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, .22);
+  overflow: hidden;
+}
+.import-progress-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand-light), var(--brand));
+  transition: width .35s ease;
+}
+.import-progress-count {
+  margin: 8px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--brand);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .import-progress, .import-progress-fill { transition: none; }
+}
