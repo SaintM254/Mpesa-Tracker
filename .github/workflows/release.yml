@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag (e.g. v2.1.0)"
+        description: "Release tag (e.g. v2.1.1)"
         required: true
-        default: "v2.1.0"
+        default: "v2.1.1"
       release_name:
         description: "Release display name"
         required: true
-        default: "M-PESA Tracker v2.1.0"
+        default: "M-PESA Tracker v2.1.1"
   push:
     branches: [main, 'arena/**']
 
@@ -52,7 +52,10 @@ jobs:
         run: |
           set -e
           mkdir -p android/app/signing
-          if [ -n "$KEYSTORE_BASE64" ]; then
+          if [ -f android/app/signing/release.p12 ] && [ -f android/keystore.properties ]; then
+            echo "Using the PINNED release key committed in the repo (reproducible signatures — updates install on top of previous versions)."
+            ls -lh android/app/signing/release.p12
+          elif [ -n "$KEYSTORE_BASE64" ]; then
             echo "Using signing keystore from KEYSTORE_BASE64 secret."
             echo "$KEYSTORE_BASE64" | base64 -d > android/app/signing/release.jks
             echo "storeFile=signing/release.jks"          >  android/keystore.properties
@@ -216,19 +219,18 @@ jobs:
           # the tag silently lands on the default branch's HEAD instead.
           target_commitish: ${{ github.sha }}
           body: |
-            ## M-PESA Tracker v2.1.0 — Android APK
+            ## M-PESA Tracker v2.1.1 — Android APK
 
-            ### 🚀 What's new in v2.1.0
-            - **Real CSV export**: the Export button now pops Android's built-in file manager (Storage Access Framework) so you pick exactly where the CSV lands. On Android 9 and below the app asks for storage permission first; newer Androids need none.
-            - **Optional Gemini AI report**: paste your free Gemini API key in Settings → Export &amp; Reports and the app rewrites your ledger into a categorized CSV report with monthly totals and insights. This is the app's **only** online feature, fully optional — everything else stays 100% offline.
-            - **Profile photo with cropping**: set a picture in Settings, drag/zoom to crop it into a circle, saved privately on-device. Tap the header avatar to change it anytime.
-            - **Circular icon bubbles**: every icon tile (transactions, categories, dock, badges) is now a clean circle instead of a squircle.
-            - **New launcher icon**: the owner-supplied coin artwork, faithfully regenerated across adaptive and legacy icon paths, splash screen, and favicon.
+            ### 🚀 What's new in v2.1.1
+            - **App icon fixed & everywhere**: the coin artwork is re-scaled so nothing clips inside adaptive icon masks (verified against the 66% safe zone). Launcher, splash, favicon, the About row in Settings and the repo README all show the new icon — the old “M” is gone for good.
+            - **Update-friendly signing from now on**: the release key is now pinned (committed PKCS#12 keystore), so every future APK is signed identically and installs straight on top of the previous one. ⚠️ One-time: v2.1.0 and older were signed with throwaway per-run keys that no longer exist, so they must be uninstalled once — Android blocks their update path by design. After this release, updates are seamless forever.
+            - **Weekly chart with day labels**: weekday names under every bar; tap a bar to read that day's total spend. Defaults to today and survives re-renders.
+            - **New “Transactions” tab** (replaces the ➕ Parse tab with a receipt icon): *View all* on the dashboard routes here and auto-highlights the tab. Transactions are grouped into **collapsible Year/Month accordions** (“September 2026”) with monthly spend totals; the latest month is expanded by default. Tapping any row opens the same Change-Category popup used on Home — edits re-render everywhere instantly, and scroll position & expanded state are preserved while switching tabs. The manual paste-SMS tool lives at the bottom of this tab.
 
             ### Installation:
-            1. Download `app-release.apk` below.
-            2. Tap **Install** (allow *Install unknown apps* for your browser if prompted).
-            3. Grant SMS access on first launch; export/AI features live in Settings → Export &amp; Reports.
+            1. ⚠️ Uninstall v2.1.0 or older **once** (their signing keys were per-run and differ from this build — Android requirement).
+            2. Download `app-release.apk` below and install.
+            3. All future versions update in place — no more “conflicting signatures”.
 
             SHA-256 checksums are in `SHA256SUMS.txt`.
           draft: false

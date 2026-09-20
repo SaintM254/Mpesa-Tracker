@@ -70,16 +70,9 @@
             <div class="balance-trend" id="dashTrend" style="display:none;"></div>
           </div>
 
-          <!-- Weekly activity bars (rendered from real data) -->
-          <div class="balance-chart" id="weeklyBars" role="img" aria-label="Daily spending chart, last 7 days">
-            <span style="--h:6%"></span>
-            <span style="--h:6%"></span>
-            <span style="--h:6%"></span>
-            <span style="--h:6%"></span>
-            <span style="--h:6%"></span>
-            <span style="--h:6%"></span>
-            <span style="--h:6%"></span>
-          </div>
+          <!-- Weekly activity bars with weekday labels (rendered from real data) -->
+          <div class="week-grid" id="weeklyBars" role="img" aria-label="Daily spending chart, last 7 days"></div>
+          <p class="week-readout" id="weeklyReadout">Tap a day to see its total spend</p>
 
           <div class="balance-foot">
             <span class="legend-item"><span class="dot active"></span>Last 7 days</span>
@@ -150,16 +143,27 @@
         </div>
       </section>
 
-      <!-- TAB 3: ADD TRANSACTION / PARSE SMS -->
-      <section id="view-add" class="app-tab-view">
-        <div class="view-header">
-          <h3>Parse M-PESA SMS</h3>
-          <p class="view-sub">Paste any Safaricom message to track instantly</p>
+      <!-- TAB 3: ALL TRANSACTIONS (grouped by month & year) -->
+      <section id="view-transactions" class="app-tab-view">
+        <div class="view-header view-header--row">
+          <button class="icon-btn-round icon-btn-round--sm" id="transactionsBackBtn" aria-label="Back to dashboard" title="Back to dashboard">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+          </button>
+          <div>
+            <h3>All Transactions</h3>
+            <p class="view-sub">Grouped by month &amp; year · tap a row to recategorize</p>
+          </div>
         </div>
 
+        <!-- Month/Year accordion groups (rendered via JS) -->
+        <div id="transactionsGroups" class="tx-groups">
+          <div class="empty-state empty-state--card">No transactions yet. Sync your SMS inbox from Settings.</div>
+        </div>
+
+        <!-- Manual add (formerly the Parse SMS tab) -->
         <div class="input-card">
-          <label for="smsInputText" class="input-label">M-PESA Confirmation SMS</label>
-          <textarea id="smsInputText" class="sms-textarea" rows="5" placeholder="e.g. QK73XYZ123 Confirmed. Ksh850.00 paid to JAVA HOUSE WESTLANDS on 20/9/26 at 12:42 PM. New M-PESA balance is Ksh4,120.00. Transaction cost, Ksh0.00."></textarea>
+          <label for="smsInputText" class="input-label">Add manually — paste an M-PESA confirmation SMS</label>
+          <textarea id="smsInputText" class="sms-textarea" rows="4" placeholder="e.g. QK73XYZ123 Confirmed. Ksh850.00 paid to JAVA HOUSE WESTLANDS on 20/9/26 at 12:42 PM. New M-PESA balance is Ksh4,120.00. Transaction cost, Ksh0.00."></textarea>
 
           <div class="sample-chips-row">
             <button class="sample-chip" id="sample1Btn">↳ Try: Send money SMS</button>
@@ -307,13 +311,13 @@
 
           <div class="settings-item">
             <div class="settings-meta">
-              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+              <img src="./assets/favicon.svg" alt="M-PESA Tracker app icon" class="settings-app-icon" />
               <div>
                 <strong>App Version</strong>
                 <p>M-PESA Tracker</p>
               </div>
             </div>
-            <span class="version-pill">v2.1.0</span>
+            <span class="version-pill">v2.1.1</span>
           </div>
 
           <div class="privacy-banner">
@@ -333,8 +337,8 @@
       <button class="dock-item" data-tab="view-analytics" aria-label="Analytics" title="Analytics">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
       </button>
-      <button class="dock-item dock-item--add" data-tab="view-add" aria-label="Add or Parse SMS" title="Add / Parse SMS">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      <button class="dock-item" data-tab="view-transactions" aria-label="All Transactions" title="Transactions">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2h16v20l-2-1.5L16 22l-2-1.5L12 22l-2-1.5L8 22l-2-1.5L4 22z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
       </button>
       <button class="dock-item" data-tab="view-categories" aria-label="Categories" title="Categories">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.42 0l8.58-8.58a1 1 0 0 0 0-1.42z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/></svg>

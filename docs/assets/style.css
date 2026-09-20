@@ -607,15 +607,8 @@ html, body {
   color: #fff;
 }
 
-.dock-item--add {
-  background: var(--app-bg);
-  color: var(--brand);
-  border: 1px solid var(--app-border);
-  border-radius: 50%;
-}
-.dock-item--add.is-active {
-  background: var(--brand);
-  color: #fff;
+.dock-item.is-active .ic {
+  stroke-width: 2.2;
 }
 
 /* Modal Windows (Permissions, Category Editor) */
@@ -1262,4 +1255,134 @@ input:checked + .slider:before {
 .crop-zoom-row input[type="range"] {
   flex: 1;
   accent-color: var(--brand);
+}
+
+/* ===========================================================
+   v2.1.1 — WEEKLY CHART LABELS, ALL-TRANSACTIONS ACCORDION
+   =========================================================== */
+
+/* Weekly chart with weekday labels + tap-to-read total */
+.week-grid {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 6px;
+}
+.week-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 62px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 6px;
+  -webkit-tap-highlight-color: transparent;
+}
+.week-bar {
+  width: 100%;
+  max-width: 30px;
+  margin-top: auto;
+  height: var(--h, 6%);
+  min-height: 4px;
+  background: rgba(255, 255, 255, .35);
+  border-radius: 4px 4px 0 0;
+  transition: height .3s ease, background .15s ease;
+  pointer-events: none;
+}
+.week-col:nth-child(odd) .week-bar { background: rgba(255, 255, 255, .6); }
+.week-col.is-selected .week-bar {
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .35);
+  border-radius: 4px;
+}
+.week-day {
+  margin-top: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: .82;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  pointer-events: none;
+}
+.week-col.is-selected .week-day { opacity: 1; font-weight: 700; }
+.week-readout {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: .95;
+  min-height: 14px;
+  color: #fff;
+}
+
+/* All-Transactions month/year accordion */
+.view-header--row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.icon-btn-round--sm { width: 36px; height: 36px; min-width: 36px; }
+
+.tx-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.tx-group {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.tx-group-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 14px;
+  background: var(--app-surface-2);
+  border: none;
+  color: var(--app-text);
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tx-group-title {
+  font-size: 13px;
+  font-weight: 700;
+  flex: 1;
+  text-align: left;
+}
+.tx-group-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--app-muted);
+  white-space: nowrap;
+}
+.tx-group-chevron {
+  color: var(--app-muted);
+  transition: transform .2s ease;
+}
+.tx-group-body { display: block; }
+.tx-group.is-collapsed .tx-group-body { display: none; }
+.tx-group.is-collapsed .tx-group-chevron { transform: rotate(-90deg); }
+.tx-list--plain { border: none; border-radius: 0; }
+
+.empty-state--card {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--r-lg);
+  margin-bottom: 16px;
+}
+
+/* Real app icon in the About row */
+.settings-app-icon {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 9px;
+  display: block;
 }

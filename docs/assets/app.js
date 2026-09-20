@@ -2,8 +2,9 @@
   'use strict';
 
   // ========================================================
-  // M-PESA TRACKER v2.1.0 — OFFLINE-FIRST M-PESA SMS ENGINE
+  // M-PESA TRACKER v2.1.1 — OFFLINE-FIRST M-PESA SMS ENGINE
   // Zero-mock ledger · SAF CSV export · optional Gemini AI · photo cropping
+  // Weekly chart labels · All-Transactions month/year accordion
   // ========================================================
 
   const STORAGE_KEY_TX = 'mpesa_tracker_tx_db_v4'; // fresh namespace: no legacy mock data
@@ -71,6 +72,12 @@
   let userCategoryRules = {};
   let inboxScanInProgress = false;
   let liveSmsListenerAttached = false;
+
+  // UI state (persists across re-renders & tab switches, in-memory only)
+  let selectedWeekDayKey = null;      // tapped bar in the weekly chart
+  const txGroupState = {};            // month/year accordion: key -> collapsed
+  const tabScroll = {};               // per-tab scroll position
+  let activeTabId = 'view-dashboard';
 
   // ========================================================
   // PERSISTENCE & LOCAL DATABASE (Indexed by code for deduplication)
@@ -390,6 +397,33 @@
     renderDashboard();
     renderAnalytics();
     renderCategoriesGrid();
+    renderTransactions();
+  }
+
+  // Shared transaction row — used by Dashboard and the All Transactions screen,
+  // so edits made on either screen stay in sync (both render from the same db).
+  function buildTxRow(tx) {
+    const cat = CATEGORIES[tx.category] || CATEGORIES.shopping;
+    const isIn = tx.type === 'received';
+    const sign = isIn ? '+' : '−';
+    const amtClass = isIn ? 'tx-amount--in' : 'tx-amount--out';
+
+    const li = document.createElement('li');
+    li.className = 'tx';
+    li.innerHTML = `
+      <div class="tx-icon ${cat.class}">
+        ${icon(cat.icon)}
+      </div>
+      <div class="tx-body">
+        <p class="tx-title">${escapeHtml(tx.counterparty)}</p>
+        <p class="tx-meta">${escapeHtml(cat.name)} · ${escapeHtml(tx.datetime || '')}</p>
+      </div>
+      <div class="tx-amount ${amtClass}">${sign} KSh ${formatKsh(tx.amount)}</div>
+    `;
+
+    // Tap any row -> change category popup (same dialog on every screen)
+    li.addEventListener('click', () => openCategoryPicker(tx));
+    return li;
   }
 
   function totals() {
@@ -435,40 +469,18 @@
     const miniCount = document.getElementById('miniCount');
     if (miniCount) miniCount.textContent = `${db.length} item${db.length === 1 ? '' : 's'}`;
 
-    // Transaction List
+    // Transaction List (recent, newest first — unchanged behavior)
     const listEl = document.getElementById('dashboardTxList');
     if (!listEl) return;
     listEl.innerHTML = '';
 
     const recents = db.slice(0, 15);
     if (!recents.length) {
-      listEl.innerHTML = '<li class="empty-state">No M-PESA transactions yet. Grant SMS access or use Settings → Sync SMS Inbox.</li>';
+      listEl.innerHTML = '<li class="empty-state">No M-PESA transactions yet. Grant SMS access or paste one in the Transactions tab.</li>';
       return;
     }
 
-    recents.forEach(tx => {
-      const cat = CATEGORIES[tx.category] || CATEGORIES.shopping;
-      const isIn = tx.type === 'received';
-      const sign = isIn ? '+' : '−';
-      const amtClass = isIn ? 'tx-amount--in' : 'tx-amount--out';
-
-      const li = document.createElement('li');
-      li.className = 'tx';
-      li.innerHTML = `
-        <div class="tx-icon ${cat.class}">
-          ${icon(cat.icon)}
-        </div>
-        <div class="tx-body">
-          <p class="tx-title">${escapeHtml(tx.counterparty)}</p>
-          <p class="tx-meta">${escapeHtml(cat.name)} · ${escapeHtml(tx.datetime || '')}</p>
-        </div>
-        <div class="tx-amount ${amtClass}">${sign} KSh ${formatKsh(tx.amount)}</div>
-      `;
-
-      // Allow tap to change category
-      li.addEventListener('click', () => openCategoryPicker(tx));
-      listEl.appendChild(li);
-    });
+    recents.forEach(tx => listEl.appendChild(buildTxRow(tx)));
   }
 
   function renderTrendChip() {
@@ -512,6 +524,7 @@
 
   function renderWeeklyBars() {
     const barsEl = document.getElementById('weeklyBars');
+    const readoutEl = document.getElementById('weeklyReadout');
     if (!barsEl) return;
 
     // Build the last 7 days ending today
@@ -520,7 +533,9 @@
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
       days.push({
-        label: d.toLocaleDateString('en-GB', { weekday: 'short' }),
+        key: `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`,
+        dow: d.toLocaleDateString('en-GB', { weekday: 'short' }),
+        label: d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' }),
         start: d.getTime(),
         end: d.getTime() + 86400000,
         total: 0
@@ -539,15 +554,33 @@
       }
     });
 
+    // Keep the tapped day selected across re-renders; default = today
+    if (!selectedWeekDayKey || !days.some(d => d.key === selectedWeekDayKey)) {
+      selectedWeekDayKey = days[days.length - 1].key;
+    }
+
     const maxTotal = Math.max(...days.map(d => d.total), 0);
     barsEl.innerHTML = '';
     days.forEach(day => {
-      const span = document.createElement('span');
+      const col = document.createElement('button');
+      col.type = 'button';
+      col.className = 'week-col' + (day.key === selectedWeekDayKey ? ' is-selected' : '');
       const pct = maxTotal === 0 ? 6 : Math.max(6, Math.round((day.total / maxTotal) * 100));
-      span.style.setProperty('--h', pct + '%');
-      span.title = `${day.label}: KSh ${formatKsh(day.total)}`;
-      barsEl.appendChild(span);
+      col.innerHTML = `<span class="week-bar" style="--h:${pct}%"></span><span class="week-day">${escapeHtml(day.dow)}</span>`;
+      col.setAttribute('aria-label', `${day.label}: KSh ${formatKsh(day.total)}`);
+      col.addEventListener('click', () => {
+        selectedWeekDayKey = day.key;
+        renderWeeklyBars();
+      });
+      barsEl.appendChild(col);
     });
+
+    const sel = days.find(d => d.key === selectedWeekDayKey);
+    if (readoutEl && sel) {
+      readoutEl.textContent = sel.total > 0
+        ? `${sel.label} · KSh ${formatKsh(sel.total)} spent`
+        : `${sel.label} · no spend recorded`;
+    }
   }
 
   function renderAnalytics() {
@@ -631,6 +664,78 @@
         <p class="category-total">KSh ${formatKsh(sum)}</p>
       `;
       grid.appendChild(card);
+    });
+  }
+
+  // ========================================================
+  // ALL TRANSACTIONS SCREEN — accordion grouped by month & year
+  // ========================================================
+  function renderTransactions() {
+    const host = document.getElementById('transactionsGroups');
+    if (!host) return;
+    host.innerHTML = '';
+
+    if (!db.length) {
+      host.innerHTML = '<div class="empty-state empty-state--card">No transactions yet. Sync your SMS inbox from Settings, or paste an SMS below.</div>';
+      return;
+    }
+
+    // Group chronologically by Year-Month
+    const groups = new Map();
+    db.forEach(t => {
+      const d = new Date(Number(t.timestamp || Date.now()));
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          label: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+          items: [],
+          spend: 0,
+          count: 0
+        });
+      }
+      const g = groups.get(key);
+      g.items.push(t);
+      g.count++;
+      if (t.type !== 'received') g.spend += Number(t.amount || 0);
+    });
+
+    const sortedKeys = [...groups.keys()].sort().reverse(); // newest month first
+
+    sortedKeys.forEach((key, idx) => {
+      const g = groups.get(key);
+      // Default: only the latest month expanded; choice remembered across renders
+      const collapsed = (key in txGroupState) ? txGroupState[key] : (idx !== 0);
+
+      const wrap = document.createElement('div');
+      wrap.className = 'tx-group' + (collapsed ? ' is-collapsed' : '');
+
+      const header = document.createElement('button');
+      header.type = 'button';
+      header.className = 'tx-group-header';
+      header.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      header.innerHTML = `
+        <span class="tx-group-title">${escapeHtml(g.label)}</span>
+        <span class="tx-group-meta" data-month-total>−KSh ${formatKsh(g.spend)} · ${g.count} item${g.count === 1 ? '' : 's'}</span>
+        <svg class="ic ic-sm tx-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      `;
+      header.addEventListener('click', () => {
+        const nowCollapsed = !wrap.classList.contains('is-collapsed');
+        txGroupState[key] = nowCollapsed;
+        wrap.classList.toggle('is-collapsed', nowCollapsed);
+        header.setAttribute('aria-expanded', String(!nowCollapsed));
+      });
+
+      const body = document.createElement('div');
+      body.className = 'tx-group-body';
+      const ul = document.createElement('ul');
+      ul.className = 'tx-list tx-list--plain';
+      g.items.forEach(tx => ul.appendChild(buildTxRow(tx)));
+      body.appendChild(ul);
+
+      wrap.appendChild(header);
+      wrap.appendChild(body);
+      host.appendChild(wrap);
     });
   }
 
@@ -843,10 +948,7 @@
         } else {
           showToast(`Transaction ${parsed.code} was already in your database (no duplicate added).`);
         }
-
-        // Switch to dashboard
-        const dashBtn = document.querySelector('[data-tab="view-dashboard"]');
-        if (dashBtn) dashBtn.click();
+        // Stay on this screen — new entry appears in its month group above
       });
     }
   }
@@ -928,10 +1030,17 @@
     const views = document.querySelectorAll('.app-tab-view');
 
     function switchTab(targetId) {
+      // Remember where the user scrolled on the current tab…
+      tabScroll[activeTabId] = window.scrollY || document.documentElement.scrollTop || 0;
+
       items.forEach(btn => btn.classList.toggle('is-active', btn.getAttribute('data-tab') === targetId));
       views.forEach(v => v.classList.toggle('is-active', v.id === targetId));
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // …and restore it on return (new tabs start at the top)
+      window.scrollTo({ top: tabScroll[targetId] || 0, behavior: 'auto' });
+      activeTabId = targetId;
     }
+    window.__switchTab = switchTab; // used by in-page shortcuts
 
     items.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -940,8 +1049,14 @@
       });
     });
 
+    // "View all" on the dashboard routes to the All Transactions screen,
+    // auto-highlighting the Transactions dock tab
     const seeAll = document.getElementById('seeAllBtn');
-    if (seeAll) seeAll.addEventListener('click', () => switchTab('view-analytics'));
+    if (seeAll) seeAll.addEventListener('click', () => switchTab('view-transactions'));
+
+    // Back shortcut from All Transactions to Home
+    const backBtn = document.getElementById('transactionsBackBtn');
+    if (backBtn) backBtn.addEventListener('click', () => switchTab('view-dashboard'));
   }
 
   // ========================================================
