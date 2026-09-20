@@ -1,25 +1,33 @@
 /* ===========================================================
-   M-PESA TRACKER — NATIVE APP STYLING (MATCHES SCREENSHOT)
-   Typography: Poppins
-   Icons: Material Icons Round
+   M-PESA TRACKER — MOBILE-FIRST DESIGN (NO OVERLAPS)
+   Font: Poppins
+   Icons: Material Icons Round (solid vector)
    Theme: Material You (Light / Dark)
    =========================================================== */
+
+/* Embed solid Material Icons Round as a reliable webfont with system fallbacks */
+@font-face {
+  font-family: 'Material Icons Round';
+  font-style: normal;
+  font-weight: 400;
+  src: url('https://fonts.gstatic.com/s/materialiconsround/v108/LDItaoyNOAY6Uewc665JcIzCKsKc_M9ETbt.woff2') format('woff2');
+  font-display: block;
+}
 
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
 :root {
-  --font-sans: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
-  /* Brand */
+  /* Safaricom M-PESA Brand Greens */
   --brand: #0f7b3a;
   --brand-strong: #0a5a29;
-  --brand-soft: #e6f4ec;
+  --brand-light: #22c55e;
   --accent: #ff7a00;
-  --accent-soft: #fff1e0;
 
-  /* Category palette — flat, distinct */
+  /* Category colors */
   --cat-food:        #ef6c00;
   --cat-transport:   #1e88e5;
   --cat-utilities:   #fbc02d;
@@ -28,8 +36,9 @@
   --cat-rent:        #00897b;
   --cat-savings:     #3949ab;
   --cat-income:      #2e7d32;
+  --cat-review:      #78909c;
 
-  /* Light Theme (Matches phone mockup) */
+  /* Theme: Light */
   --app-bg:          #f1f5f9;
   --app-surface:     #ffffff;
   --app-surface-2:   #f8fafc;
@@ -44,7 +53,7 @@
   --r-sm: 8px;
   --r-md: 14px;
   --r-lg: 20px;
-  --r-xl: 28px;
+  --r-xl: 26px;
 }
 
 [data-theme="dark"] {
@@ -63,16 +72,16 @@
 html, body {
   margin: 0;
   padding: 0;
-  height: 100%;
+  min-height: 100%;
   font-family: var(--font-sans);
   background: var(--app-bg);
   color: var(--app-text);
   -webkit-font-smoothing: antialiased;
 }
 
-/* Material Icons Helper */
+/* Material Icons Round Class */
 .material-icons-round {
-  font-family: 'Material Icons Round';
+  font-family: 'Material Icons Round', sans-serif;
   font-weight: normal;
   font-style: normal;
   font-size: 20px;
@@ -86,33 +95,47 @@ html, body {
   -webkit-font-feature-settings: 'liga';
   -webkit-font-smoothing: antialiased;
   vertical-align: middle;
+  flex-shrink: 0;
+  user-select: none;
 }
 
-/* App Viewport Center Container */
+/* Fallback protection: if font fails to load, prevent raw ligatures from overflowing buttons */
+.material-icons-round {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+/* Root App Shell: responsive to any mobile width, max-width bounded on tablets */
 .app-viewport {
-  max-width: 480px;
+  width: 100%;
+  max-width: 500px;
   margin: 0 auto;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--app-bg);
   position: relative;
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.05);
 }
 
-/* Top Bar */
+/* Header & Top Bar */
 .app-topbar {
   position: sticky;
   top: 0;
   z-index: 40;
   background: var(--app-bg);
-  padding: 12px 18px 4px;
+  padding: 14px 18px 8px;
 }
 
 .dash-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.dash-user {
+  display: flex;
+  flex-direction: column;
 }
 
 .dash-hello {
@@ -122,7 +145,7 @@ html, body {
 }
 
 .dash-name {
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 700;
   margin: 2px 0 0;
   color: var(--app-text);
@@ -135,8 +158,8 @@ html, body {
 }
 
 .icon-btn-round {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   border: 1px solid var(--app-border);
   background: var(--app-surface);
@@ -149,25 +172,25 @@ html, body {
 
 .icon-btn-round [data-icon="dark"] { display: none; }
 [data-theme="dark"] .icon-btn-round [data-icon="light"] { display: none; }
-[data-theme="dark"] .icon-btn-round [data-icon="dark"]  { display: inline; }
+[data-theme="dark"] .icon-btn-round [data-icon="dark"]  { display: inline-block; }
 
 .dash-avatar {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--brand), var(--brand-strong));
   color: #fff;
   display: grid;
   place-items: center;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: .5px;
 }
 
 /* Main Content Area */
 .app-main-content {
   flex: 1;
-  padding: 8px 16px 90px;
+  padding: 6px 16px 110px;
   overflow-y: auto;
 }
 
@@ -178,22 +201,64 @@ html, body {
   display: block;
 }
 
-/* VIEW HEADERS */
-.view-header {
-  margin: 6px 0 16px;
+/* Notification & Permission Banner */
+.perm-banner {
+  background: rgba(15, 123, 58, 0.12);
+  border: 1px solid rgba(15, 123, 58, 0.25);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
-.view-header h3 {
-  margin: 0;
-  font-size: 19px;
-  font-weight: 700;
+
+.perm-banner-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
 }
-.view-sub {
+
+.perm-banner-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.perm-banner-text strong {
+  display: block;
+  font-size: 13px;
+  color: var(--app-text);
+}
+
+.perm-banner-text p {
   margin: 2px 0 0;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--app-muted);
 }
 
-/* BALANCE HERO CARD (Identical to mockup) */
+.perm-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.icon-btn-ghost {
+  background: none;
+  border: none;
+  color: var(--app-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+/* Balance Hero Card */
 .balance-card {
   margin-top: 4px;
   margin-bottom: 14px;
@@ -201,7 +266,7 @@ html, body {
   background: linear-gradient(135deg, var(--balance-grad-start), var(--balance-grad-end));
   color: #fff;
   border-radius: var(--r-xl);
-  box-shadow: 0 8px 24px rgba(15, 123, 58, 0.25);
+  box-shadow: 0 8px 24px rgba(15, 123, 58, 0.22);
 }
 
 .balance-row {
@@ -211,14 +276,13 @@ html, body {
 }
 
 .balance-label {
-  font-size: 11px;
-  opacity: .85;
+  font-size: 12px;
+  opacity: .88;
   margin: 0;
-  letter-spacing: .02em;
 }
 
 .balance-amount {
-  font-size: 24px;
+  font-size: 25px;
   font-weight: 700;
   margin: 4px 0 0;
 }
@@ -228,23 +292,23 @@ html, body {
   align-items: center;
   gap: 4px;
   background: rgba(255, 255, 255, .18);
-  padding: 4px 9px;
+  padding: 4px 10px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .balance-trend .material-icons-round {
   font-size: 14px;
 }
 
-/* Chart Canvas / SVG Bars */
 .balance-chart {
   display: flex;
   align-items: flex-end;
-  gap: 7px;
+  gap: 8px;
   height: 48px;
-  margin: 14px 0 10px;
+  margin: 16px 0 10px;
 }
 
 .balance-chart span {
@@ -320,6 +384,9 @@ html, body {
   font-size: 13px;
   font-weight: 700;
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mini-stat--in .mini-stat-val { color: var(--cat-income); }
@@ -331,7 +398,7 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 12px 2px 8px;
+  margin: 14px 2px 10px;
 }
 
 .section-title h3 {
@@ -352,7 +419,10 @@ html, body {
   padding: 4px 6px;
 }
 
-/* TRANSACTION FEED LIST */
+/* ===========================================================
+   TRANSACTION FEED (ABSOLUTELY NO OVERLAPPING)
+   Flexbox layout with fixed icon width, fluid middle, fixed right.
+   =========================================================== */
 .tx-list {
   list-style: none;
   padding: 0;
@@ -364,29 +434,42 @@ html, body {
 }
 
 .tx {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 14px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--app-border);
+  cursor: pointer;
+  transition: background-color .15s ease;
 }
 
 .tx:last-child {
   border-bottom: 0;
 }
 
-.tx-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  flex-shrink: 0;
+.tx:hover {
+  background-color: var(--app-surface-2);
 }
 
-.tx-icon .material-icons-round { font-size: 20px; }
+.tx-icon {
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  max-width: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.tx-icon .material-icons-round {
+  font-size: 20px;
+  line-height: 1;
+}
 
 .tx-icon--food       { background: var(--cat-food); }
 .tx-icon--transport  { background: var(--cat-transport); }
@@ -396,9 +479,11 @@ html, body {
 .tx-icon--rent       { background: var(--cat-rent); }
 .tx-icon--savings    { background: var(--cat-savings); }
 .tx-icon--received   { background: var(--cat-income); }
+.tx-icon--review     { background: var(--cat-review); }
 
 .tx-body {
-  min-width: 0;
+  flex: 1;
+  min-width: 0; /* Crucial: allows flex items to shrink and prevents text overlap */
 }
 
 .tx-title {
@@ -409,24 +494,232 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--app-text);
+  line-height: 1.3;
 }
 
 .tx-meta {
   font-size: 11px;
   color: var(--app-muted);
-  margin: 2px 0 0;
+  margin: 3px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
 .tx-amount {
   font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
+  text-align: right;
+  flex-shrink: 0;
+  line-height: 1.3;
 }
 
 .tx-amount--in  { color: var(--cat-income); }
 .tx-amount--out { color: var(--app-text); }
 
-/* TAB 2: ANALYTICS SUMMARY */
+.empty-state {
+  padding: 30px 16px;
+  text-align: center;
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+/* ===========================================================
+   BOTTOM DOCK (NO TEXT BLEED, PERFECT SQUARE BUTTONS)
+   =========================================================== */
+.dock {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 28px);
+  max-width: 450px;
+  padding: 8px 10px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border-subtle);
+  border-radius: 26px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+  z-index: 50;
+}
+
+.dock-item {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--app-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: all .2s ease;
+  overflow: hidden; /* Prevents ligature text from escaping */
+}
+
+.dock-item .material-icons-round {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.dock-item.is-active {
+  background: var(--brand);
+  color: #fff;
+}
+
+.dock-item--add {
+  background: var(--app-bg);
+  color: var(--brand);
+  border: 1px solid var(--app-border);
+}
+.dock-item--add.is-active {
+  background: var(--brand);
+  color: #fff;
+}
+
+/* Modal Windows (Permissions, Category Editor) */
+.modal-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+
+.modal-backdrop.is-open {
+  display: flex;
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 480px;
+  background: var(--app-surface);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  padding: 24px 20px 30px;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.2);
+  animation: slideUp .25s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.modal-icon-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(15, 123, 58, 0.12);
+  color: var(--brand);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.modal-icon-badge .material-icons-round { font-size: 26px; }
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.modal-header p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--app-muted);
+}
+
+.modal-body p {
+  font-size: 13px;
+  color: var(--app-text);
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.modal-security-points {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+  display: grid;
+  gap: 10px;
+}
+
+.modal-security-points li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--app-muted);
+}
+
+.modal-security-points .material-icons-round {
+  color: var(--brand);
+  font-size: 18px;
+}
+
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Category Option Grid inside Modal */
+.cat-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.cat-option-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-2);
+  color: var(--app-text);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.cat-option-btn.is-selected {
+  border-color: var(--brand);
+  background: rgba(15, 123, 58, 0.1);
+}
+
+.cat-bar-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+.cat-bar-badge .material-icons-round { font-size: 14px; }
+
+/* Analytics Breakdown */
 .summary-card {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
@@ -470,7 +763,6 @@ html, body {
 .stat--out strong { color: var(--app-text); }
 .stat--net strong { color: var(--brand); }
 
-/* Category Bars Breakdown */
 .category-breakdown-card {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
@@ -484,7 +776,7 @@ html, body {
 }
 
 .cat-bar-row {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .cat-bar-header {
@@ -501,13 +793,6 @@ html, body {
   font-size: 12px;
   font-weight: 600;
 }
-
-.cat-bar-badge {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-}
-.cat-bar-badge .material-icons-round { font-size: 14px; }
 
 .cat-bar-amount {
   font-size: 12px;
@@ -527,7 +812,7 @@ html, body {
   transition: width .4s ease;
 }
 
-/* TAB 3: SMS PARSER FORM */
+/* SMS Input Form */
 .input-card {
   background: var(--app-surface);
   border: 1px solid var(--app-border);
@@ -561,11 +846,24 @@ html, body {
   border-color: var(--brand);
 }
 
-.parse-actions {
+.sample-chips-row {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 14px;
+  margin: 12px 0;
+}
+
+.sample-chip {
+  background: var(--app-surface-2);
+  border: 1px solid var(--app-border);
+  color: var(--app-text);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  text-align: left;
 }
 
 .btn {
@@ -626,7 +924,7 @@ html, body {
 }
 
 .sms-help-card li {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 8px;
   font-size: 12px;
@@ -637,7 +935,7 @@ html, body {
   font-size: 16px;
 }
 
-/* TAB 4: CATEGORIES GRID */
+/* Categories Grid */
 .categories-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -670,7 +968,7 @@ html, body {
   margin: 0;
 }
 
-/* TAB 5: SETTINGS */
+/* Settings */
 .settings-list {
   display: flex;
   flex-direction: column;
@@ -719,7 +1017,7 @@ html, body {
   text-align: right;
 }
 
-/* iOS-style toggle switch */
+/* Switch */
 .switch {
   position: relative;
   display: inline-block;
@@ -751,12 +1049,8 @@ input:checked + .slider {
 input:checked + .slider:before {
   transform: translateX(20px);
 }
-.slider.round {
-  border-radius: 34px;
-}
-.slider.round:before {
-  border-radius: 50%;
-}
+.slider.round { border-radius: 34px; }
+.slider.round:before { border-radius: 50%; }
 
 .privacy-banner {
   background: rgba(15, 123, 58, 0.08);
@@ -779,62 +1073,10 @@ input:checked + .slider:before {
   line-height: 1.5;
 }
 
-/* ===========================================================
-   BOTTOM DOCK (Identical to screenshot mockup)
-   =========================================================== */
-.dock {
-  position: fixed;
-  bottom: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: calc(100% - 32px);
-  max-width: 440px;
-  padding: 8px 12px;
-  background: var(--app-surface);
-  border: 1px solid var(--app-border-subtle);
-  border-radius: 24px;
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
-  z-index: 50;
-}
-
-.dock-item {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  background: transparent;
-  border: none;
-  color: var(--app-muted);
-  cursor: pointer;
-  padding: 0;
-  transition: all .2s ease;
-}
-
-.dock-item .material-icons-round { font-size: 22px; }
-
-.dock-item.is-active {
-  background: var(--brand);
-  color: #fff;
-}
-
-.dock-item--add {
-  background: var(--app-bg);
-  color: var(--brand);
-  border: 1px solid var(--app-border);
-}
-.dock-item--add.is-active {
-  background: var(--brand);
-  color: #fff;
-}
-
 /* Toast */
 .app-toast {
   position: fixed;
-  bottom: 80px;
+  bottom: 84px;
   left: 50%;
   transform: translateX(-50%) translateY(20px);
   background: #0f172a;
@@ -843,11 +1085,11 @@ input:checked + .slider:before {
   border-radius: 999px;
   font-size: 12px;
   font-weight: 500;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   opacity: 0;
   pointer-events: none;
   transition: all .25s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 99;
+  z-index: 999;
   white-space: nowrap;
 }
 .app-toast.show {
