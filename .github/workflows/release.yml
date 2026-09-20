@@ -79,7 +79,7 @@ jobs:
             echo "keyAlias=$ALIAS"                 >> android/keystore.properties
             echo "keyPassword=$KS_PASS"            >> android/keystore.properties
           fi
-          ls -lh android/app/signing/release.jks
+          ls -lh android/app/signing/ 2>/dev/null || true
 
       - name: Install Capacitor deps
         run: npm ci
