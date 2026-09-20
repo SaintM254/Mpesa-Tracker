@@ -2,10 +2,11 @@
   'use strict';
 
   // ========================================================
-  // M-PESA TRACKER v3.1.0 — OFFLINE-FIRST M-PESA SMS ENGINE
+  // M-PESA TRACKER v3.1.1 — OFFLINE-FIRST M-PESA SMS ENGINE
   // Zero-mock ledger · SAF CSV export · optional Gemini AI · photo cropping
   // Glassmorphism UI · Floating pill dock · Apple-style polish
   // Gemini model fallback · Fees & Fuliza leakage audit · Wallet chat
+  // v3.1.1: boot hardening — isolated init steps
   // ========================================================
 
   const STORAGE_KEY_TX = 'mpesa_tracker_tx_db_v4'; // fresh namespace: no legacy mock data
@@ -1517,7 +1518,7 @@
     updateAiOfflineBadge();
     window.addEventListener('online', updateAiOfflineBadge);
     window.addEventListener('offline', updateAiOfflineBadge);
-    initAiFeatures();
+    initAiExport();
     initLeakageAudit();
     initWalletChat();
   }
@@ -1732,17 +1733,19 @@
 
   // --- INITIALIZE ---
   document.addEventListener('DOMContentLoaded', () => {
-    runSelfTests();
-    loadDatabase();
-    initTheme();
-    initUser();
-    initProfilePhoto();
-    renderAllViews();
-    initTabs();
-    initSettingsActions();
-    initAiFeatures();
-    initInboxSync();
-    initPermissionScreen();
+    // Isolated boot steps: an exception in one initializer can never
+    // silently starve the rest (v3.1.1 hardening).
+    [
+      runSelfTests, loadDatabase, initTheme, initUser, initProfilePhoto,
+      renderAllViews, initTabs, initSettingsActions, initAiFeatures,
+      initInboxSync, initPermissionScreen
+    ].forEach(fn => {
+      try {
+        fn();
+      } catch (e) {
+        console.warn('Init step failed:', fn && fn.name, e && e.message);
+      }
+    });
   });
 
 })();

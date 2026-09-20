@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag (e.g. v3.1.0)"
+        description: "Release tag (e.g. v3.1.1)"
         required: true
-        default: "v3.1.0"
+        default: "v3.1.1"
       release_name:
         description: "Release display name"
         required: true
-        default: "M-PESA Tracker v3.1.0"
+        default: "M-PESA Tracker v3.1.1"
   push:
     branches: [main, 'arena/**']
 
@@ -219,20 +219,18 @@ jobs:
           # the tag silently lands on the default branch's HEAD instead.
           target_commitish: ${{ github.sha }}
           body: |
-            ## M-PESA Tracker v3.1.0 — Android APK
+            ## M-PESA Tracker v3.1.1 — Android APK
 
-            ### 🚀 What's new in v3.1.0
-            - **Optional AI enhancements (Settings only — Home stays clean)**:
-              - **Gemini 404 fixed**: the API client now uses the standard `v1beta` `generateContent` endpoint with an ordered model fallback chain (`gemini-2.0-flash` → `gemini-1.5-flash` → `gemini-1.5-flash-8b`). A 404 on a retired model rolls over cleanly; failures capture the real response body instead of the misleading *“Check your internet connection”*. Final graceful message: *“Gemini AI feature failed. Local features remain unaffected.”*
-              - **Fees & Fuliza Leakage audit**: one tap computes your 30-day M-PESA “leakage” — send/Paybill/agent costs, airtime fees, Fuliza access fees & interest — with AI savings tips. Offline or key-less? It instantly shows **local arithmetic totals** from the parsed “Transaction cost” fields instead.
-              - **Chat with your Wallet**: ask plain-English questions (“How much did I send Peter vs Jane in August?”). Gemini answers from an anonymized snapshot — only date/type/category/name/amount/fee are shared; codes, phone numbers and balances **never** leave the device.
-            - **Offline guardrails**: every AI call is wrapped in `isOnline()` + `isGeminiEnabled()` checks; an unobtrusive “AI features unavailable offline” badge appears when connectivity drops; nothing local is ever blocked.
-            - **Cleaner CSV**: columns are now `Code, Date, Time, Type, Category, Counterparty, Phone, Amount (KSh), Cost (KSh), Balance (KSh)` — date & time are **always filled** (parsed from the SMS timestamp), category shows friendly names, missing values read `-`. 100% local generation via the Android file manager (SAF).
-            - The manual “paste an SMS” field was removed from All Transactions (inbox sync remains in Settings).
+            ### 🛠 Hotfix: AI buttons were silently dead
+            - **Root cause found & fixed**: a self-recursive call inside the AI initializer (`initAiFeatures` accidentally invoked itself instead of `initAiExport`). On startup it raised `Maximum call stack size exceeded`, which aborted that boot step — so the clicks of **all three AI buttons** (leakage audit, wallet chat, AI report) and the API-key listener never got attached. No toast, no response, exactly as reported. This also starved the SMS-sync initializer.
+            - **Verified before shipping**: reproduced the exact silent-buttons behavior in a scripted DOM harness, then re-ran it post-fix — key persistence, all three buttons, offline badge, local leakage arithmetic (KSh totals verified), and the graceful failure bubbles/toasts all fire correctly with zero console errors.
+            - **Hardened boot**: every initializer now runs in its own guard, so a single future fault can never again starve the rest of the app silently.
+
+            Everything else from v3.1.0 is unchanged (Gemini model fallback chain, fee audit + local fallback, wallet chat privacy snapshot, clean CSV).
 
             ### Installation:
-            1. Download `app-release.apk` below and install on top — pinned signature, no conflicts from v2.1.1+.
-            2. AI features live in **Settings → Export &amp; Reports** and need your own free key from aistudio.google.com. Everything else is 100% offline.
+            1. Install `app-release.apk` on top — pinned signature, no conflicts.
+            2. **Settings → Export &amp; Reports**: paste your key → toast confirms it saves; tap *Audit My M-PESA Fees* and *Chat with your Wallet* — they now respond.
 
             SHA-256 checksums are in `SHA256SUMS.txt`.
           draft: false
