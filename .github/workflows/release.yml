@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag (e.g. v5.4)"
+        description: "Release tag (e.g. v5.5)"
         required: true
-        default: "v5.4"
+        default: "v5.5"
       release_name:
         description: "Release display name"
         required: true
-        default: "M-PESA Tracker v5.4"
+        default: "M-PESA Tracker v5.5"
   push:
     branches: [main, 'arena/**']
 
@@ -219,17 +219,23 @@ jobs:
           # the tag silently lands on the default branch's HEAD instead.
           target_commitish: ${{ github.sha }}
           body: |
-            ## M-PESA Tracker v5.4 — Android APK
+            ## M-PESA Tracker v5.5 — Android APK
 
-            ### ⚡ Lag surgery + honest first-run setup
-            1. **First-load freeze: fixed at the root (not CSS this time).** Every imported SMS re-sorted and rewrote the ENTIRE ledger to storage — a ~900-message first setup meant ~900 growing disk writes and array sorts on the UI thread. Imports are now batched (Set-dedupe, ONE sort + ONE save per batch) with micro-yields, so the app stays responsive while history streams in.
-            2. **Floating first-run progress card.** During the one-time full scan, a card floats above everything — in the app's own design style — with a live "N transactions found so far" counter, a smooth brand-gradient bar, and the honest note: *this only happens on first setup; after this, everything is instant.*
-            3. **Category picker lag gone.** Picking a category used to rebuild EVERY screen synchronously — including every month's rows in All Transactions. Now the tap is acknowledged instantly (modal closes + toast), and only the visible view re-renders on the next frame; other views rebuild when you visit them.
-            4. **Expanded category no longer collapses after an edit.** It stays open with its remaining items, so you can work through a whole review list without re-tapping.
-            5. **Lazy month accordions.** Collapsed months now carry zero row DOM — with years of history that was the hidden cost behind tab switches, picker edits and sync renders.
-            6. **House rule restored:** removed the spinning sync icon — the live counter is the indicator (no spinning loaders anywhere).
+            ### 🧠 AI now sees your WHOLE ledger
+            Root cause of the screenshot bug: every AI feature only received the **newest 140 raw rows**. With history back to 2021, Gemini literally could not see older years — then confidently (and wrongly) answered "no transactions exist for 2024".
 
-            Everything from v5.0–v5.3 stays: monthly dashboard, Needs review + learning categories, Gemini 503-roll, AMOLED, deep scan, instant touch feel. Installs on top — pinned signature.
+            **v5.5 gives every AI feature a complete local-computed summary of the ENTIRE ledger:**
+            - Coverage header: date range + total record count (ground truth — the model can never claim a covered period is empty).
+            - Per-year and per-month buckets: sent / received / **fees** / **Fuliza** / counts.
+            - Spend per category per year + top-40 counterparties with first/last seen dates.
+            - Same privacy fields as before (dates, categories, names, amounts, fees) — codes, phones and balances still never leave the device.
+            - Raw newest 100 rows stay attached for day-level questions.
+            Powers **Chat with your Wallet** (ask "KPLC total in 2024" — it now answers from 2021→today), the **AI Report CSV** and the fees audit.
+
+            ### 🧾 Fees & Fuliza audit: full history
+            Was: last 30 days (or newest 200 rows). Now: **every parsed fee across your entire history**, bucketed per year and month — the AI audit reports lifetime totals, most expensive year/month, trend direction and Fuliza share, and the offline fallback panel shows the same lifetime math with a per-year breakdown.
+
+            Everything from v5.0–v5.4 stays. Installs on top — pinned signature.
 
             SHA-256 checksums are in `SHA256SUMS.txt`.
           draft: false

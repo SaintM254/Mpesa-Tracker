@@ -2188,3 +2188,9 @@ body::before { animation: none !important; will-change: auto !important; }
 @media (prefers-reduced-motion: reduce) {
   .import-progress, .import-progress-fill { transition: none; }
 }
+
+/* ===========================================================
+   v5.5 — Full-history leakage breakdown
+   =========================================================== */
+.ai-panel-list--years { margin-top: 10px; opacity: .9; }
+.ai-panel-list--years li { font-size: 11px; padding: 2px 0; }

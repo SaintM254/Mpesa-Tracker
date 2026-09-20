@@ -18,6 +18,9 @@
   // v5.4: bulk import (1 sort + 1 save per batch — kills first-load
   // freeze) · first-run floating progress overlay · lazy accordion
   // bodies · render-active-view-only edits · sticky category expansion
+  // v5.5: AI gets the WHOLE ledger — complete yearly/monthly/category /
+  // counterparty/fee/Fuliza aggregates + raw recent rows (no more
+  // "no data for 2024" with history to 2021) · full-history fees audit
   // ========================================================
 
   const STORAGE_KEY_TX = 'mpesa_tracker_tx_db_v4'; // fresh namespace: no legacy mock data
@@ -1549,6 +1552,72 @@
     }));
   }
 
+  // COMPLETE statistical summary of the ENTIRE ledger, computed locally.
+  // v5.5 root cause: AI features only received the newest ~140 raw rows,
+  // so with history back to 2021 the model literally could not see older
+  // years — and then asserted "no transactions exist for 2024". These
+  // aggregates cover EVERY record (same privacy fields as aiSnapshot:
+  // date bucket, category, counterparty, amounts, fees — never codes,
+  // phones or balances), so any year/month/category question has ground
+  // truth behind it.
+  function aiLedgerSummary() {
+    const pad = n => String(n).padStart(2, '0');
+    const iso = ts => { const d = new Date(ts); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+    const monthly = new Map();
+    const yearly = new Map();
+    const catByYear = new Map();
+    const people = new Map();
+    let oldest = 0, newest = 0;
+    db.forEach(t => {
+      const ts = Number(t.timestamp || 0);
+      if (!ts) return;
+      if (!oldest || ts < oldest) oldest = ts;
+      if (ts > newest) newest = ts;
+      const d = new Date(ts);
+      const y = d.getFullYear();
+      const m = y + '-' + pad(d.getMonth() + 1);
+      const amt = Number(t.amount || 0);
+      const fee = Number(t.cost || 0);
+      const isIn = t.type === 'received';
+      const isFuliza = /fuliza/i.test(t.counterparty || '') || t.type === 'fee';
+      const bump = (map, key) => {
+        const o = map.get(key) || { s: 0, r: 0, f: 0, z: 0, n: 0 };
+        if (isIn) o.r += amt; else o.s += amt;
+        o.f += fee;
+        if (isFuliza) o.z += amt + fee;
+        o.n++;
+        map.set(key, o);
+      };
+      bump(monthly, m);
+      bump(yearly, y);
+      if (!isIn) {
+        const ck = y + '|' + (t.category || 'shopping');
+        catByYear.set(ck, (catByYear.get(ck) || 0) + amt);
+      }
+      const name = (t.counterparty || 'Unknown').slice(0, 36);
+      const p = people.get(name) || { n: 0, s: 0, r: 0, first: ts, last: ts };
+      p.n++;
+      if (isIn) p.r += amt; else p.s += amt;
+      if (ts < p.first) p.first = ts;
+      if (ts > p.last) p.last = ts;
+      people.set(name, p);
+    });
+    return {
+      coverage: {
+        from: oldest ? iso(oldest) : null,
+        to: newest ? iso(newest) : null,
+        transactions: db.length
+      },
+      byYear: [...yearly.entries()].sort().map(([y, o]) => ({ y, sent: o.s, received: o.r, fees: o.f, fuliza: o.z, count: o.n })),
+      byMonth: [...monthly.entries()].sort().map(([m, o]) => ({ m, sent: o.s, received: o.r, fees: o.f, fuliza: o.z })),
+      spendByCategoryYear: [...catByYear.entries()].sort().map(([k, total]) => { const [y, c] = k.split('|'); return { year: Number(y), category: c, total }; }),
+      topCounterparties: [...people.entries()]
+        .sort((a, b) => (b[1].s + b[1].r) - (a[1].s + a[1].r))
+        .slice(0, 40)
+        .map(([name, p]) => ({ name, sent: p.s, received: p.r, count: p.n, first: iso(p.first), last: iso(p.last) }))
+    };
+  }
+
   // --------------------------------------------------------
   // AI STATEMENT CSV (Gemini)
   // --------------------------------------------------------
@@ -1583,9 +1652,11 @@
       }
 
       const prompt =
-        'You are a personal-finance CSV generator. Here is my M-PESA transaction ledger as JSON. ' +
-        'Each entry: d=date&time, t=type, c=category, p=counterparty, a=amount KES, f=fee KES.\n' +
-        JSON.stringify(aiSnapshot(db, 150)) +
+        'You are a personal-finance CSV generator. You receive (A) COMPLETE pre-computed aggregates of my entire M-PESA ledger ' +
+        '(SUMMARY.coverage from..to = full range, every transaction included) and (B) the raw newest rows for flavour. ' +
+        'Do not limit the report to the raw rows — the summary IS the whole ledger.\n' +
+        'SUMMARY: ' + JSON.stringify(aiLedgerSummary()) + '\n' +
+        'RAW NEWEST ROWS: ' + JSON.stringify(aiSnapshot(db, 80)) +
         '\n\nProduce a UTF-8 CSV report with EXACTLY these sections in order:\n' +
         '1) Header row: Section,Month,Category,Transactions Count,Total (KSh),Share of Spend %,Insight\n' +
         '2) One row per category per calendar month summarized from the data (Section=Monthly)\n' +
@@ -1621,43 +1692,67 @@
   }
 
   // --------------------------------------------------------
-  // FEES & FULIZA LEAKAGE AUDIT (30 days)
+  // FEES & FULIZA LEAKAGE AUDIT (full ledger history — v5.5)
   // --------------------------------------------------------
-  function leakageWindowRows() {
-    const cutoff = Date.now() - 30 * 86400000;
-    const rows = db.filter(t => Number(t.timestamp || 0) >= cutoff);
-    return rows.length ? rows : db.slice(0, 200); // newest-first db; fall back to latest slice
-  }
-
-  // Offline fallback: plain local arithmetic on the parsed "Transaction cost"
-  // fields and Fuliza-tagged entries. Always available — key or no key.
-  function computeLocalLeakage(rows) {
-    let transferFees = 0, airtimeFees = 0, fulizaFees = 0;
-    rows.forEach(t => {
+  // Full-history leakage maths: EVERY parsed "Transaction cost", Fuliza
+  // charge and airtime fee across the entire ledger, bucketed per year +
+  // month — so both the AI audit and the offline fallback cover ALL of it,
+  // not just the last 30 days.
+  function computeLeakageStats() {
+    const pad = n => String(n).padStart(2, '0');
+    let transferFees = 0, airtimeFees = 0, fulizaFees = 0, oldest = 0, newest = 0;
+    const byYear = new Map();
+    const byMonth = new Map();
+    db.forEach(t => {
       if (t.type === 'received') return;
+      const ts = Number(t.timestamp || 0);
       const cost = Number(t.cost || 0);
       const isFuliza = /fuliza/i.test(t.counterparty || '') || t.type === 'fee';
-      if (isFuliza) {
-        fulizaFees += Number(t.amount || 0) + cost;
-        return;
-      }
-      if (t.category === 'airtime') airtimeFees += cost;
-      else transferFees += cost;
+      const isAirtime = t.category === 'airtime';
+      const fulizaLeak = isFuliza ? Number(t.amount || 0) + cost : 0;
+      const airtimeLeak = (!isFuliza && isAirtime) ? cost : 0;
+      const transferLeak = (isFuliza || isAirtime) ? 0 : cost;
+      if (!transferLeak && !airtimeLeak && !fulizaLeak) return;
+      transferFees += transferLeak;
+      airtimeFees += airtimeLeak;
+      fulizaFees += fulizaLeak;
+      if (!ts) return;
+      if (!oldest || ts < oldest) oldest = ts;
+      if (ts > newest) newest = ts;
+      const d = new Date(ts);
+      const leak = transferLeak + airtimeLeak + fulizaLeak;
+      const bump = (map, k) => {
+        const o = map.get(k) || { total: 0, transfer: 0, airtime: 0, fuliza: 0 };
+        o.total += leak; o.transfer += transferLeak; o.airtime += airtimeLeak; o.fuliza += fulizaLeak;
+        map.set(k, o);
+      };
+      bump(byYear, d.getFullYear());
+      bump(byMonth, d.getFullYear() + '-' + pad(d.getMonth() + 1));
     });
-    return { transferFees, airtimeFees, fulizaFees, total: transferFees + airtimeFees + fulizaFees };
+    return {
+      transferFees, airtimeFees, fulizaFees,
+      total: transferFees + airtimeFees + fulizaFees,
+      years: [...byYear.entries()].sort((a, b) => String(b[0]).localeCompare(String(a[0]))).map(([year, o]) => ({ year, ...o })),
+      months: [...byMonth.entries()].sort().map(([month, o]) => ({ month, ...o })),
+      oldest, newest
+    };
   }
 
-  function renderLeakageLocal(resultEl, rows, noteHtml) {
-    const L = computeLocalLeakage(rows);
+  function renderLeakageLocal(resultEl, noteHtml) {
+    const L = computeLeakageStats();
+    const yearRows = L.years.slice(0, 6).map(y =>
+      `<li><span>${y.year}</span><strong>KSh ${formatKsh(y.total)}</strong></li>`).join('');
     resultEl.classList.add('is-open');
     resultEl.innerHTML =
-      '<span class="ai-panel-badge ai-panel-badge--local">Local estimate · works offline</span>' +
+      '<span class="ai-panel-badge ai-panel-badge--local">Local estimate · full history · works offline</span>' +
       '<ul class="ai-panel-list">' +
       `<li><span>Transfer &amp; Paybill costs</span><strong>KSh ${formatKsh(L.transferFees)}</strong></li>` +
       `<li><span>Airtime purchase fees</span><strong>KSh ${formatKsh(L.airtimeFees)}</strong></li>` +
       `<li><span>Fuliza fees &amp; interest</span><strong>KSh ${formatKsh(L.fulizaFees)}</strong></li>` +
       '</ul>' +
-      `<p class="ai-panel-total">Total 30-day leakage: <strong>KSh ${formatKsh(L.total)}</strong></p>` +
+      `<p class="ai-panel-total">Total lifetime leakage: <strong>KSh ${formatKsh(L.total)}</strong></p>` +
+      (L.years.length > 1 ? '<ul class="ai-panel-list ai-panel-list--years">' + yearRows + '</ul>' : '') +
+      `<p class="ai-panel-note">Covers every fee parsed across your full history${L.oldest ? ` (${formatFriendlyDate(L.oldest)} → ${formatFriendlyDate(L.newest)})` : ''}. Fees appear only where the SMS states a transaction cost.</p>` +
       (noteHtml || '');
   }
 
@@ -1672,12 +1767,10 @@
         showToast('No transactions yet — sync your SMS inbox first.');
         return;
       }
-      const rows = leakageWindowRows();
-
       // Guardrails first: offline or no key -> instant local arithmetic,
       // the audit never hard-fails
       if (!isOnline() || !isGeminiEnabled()) {
-        renderLeakageLocal(resultEl, rows,
+        renderLeakageLocal(resultEl,
           `<p class="ai-panel-note">${!isOnline() ? 'You are offline. ' : 'No Gemini key set. '}` +
           'Go online with a key for the full AI breakdown &amp; savings tips.</p>');
         return;
@@ -1687,16 +1780,20 @@
       btn.classList.add('btn-loading');
       if (label) label.textContent = 'Auditing with Gemini…';
 
+      const L = computeLeakageStats();
       const prompt =
-        'You are an M-PESA cost auditor. Below are my M-PESA transactions from roughly the last 30 days as JSON.\n' +
-        'Each entry: d=date&time, t=type (sent/received/airtime/withdraw/fee), c=category, p=counterparty, a=amount KES, f=explicit transaction cost KES.\n' +
-        JSON.stringify(aiSnapshot(rows, 150)) + '\n' +
+        'You are an M-PESA cost auditor for a Kenyan wallet ledger.\n' +
+        'These are COMPLETE fee aggregates across my ENTIRE M-PESA history (every parsed transaction cost, Fuliza charge and airtime purchase cost), already bucketed — use ONLY these numbers, estimating nothing:\n' +
+        'TOTALS_KES: ' + JSON.stringify({ transferAndPaybillCosts: L.transferFees, airtimePurchaseFees: L.airtimeFees, fulizaFeesAndInterest: L.fulizaFees, lifetimeTotal: L.total, coverageFrom: formatFriendlyDate(L.oldest), coverageTo: formatFriendlyDate(L.newest) }) + '\n' +
+        'PER_YEAR: ' + JSON.stringify(L.years) + '\n' +
+        'PER_MONTH (chronological): ' + JSON.stringify(L.months.slice(-36)) + '\n' +
         'TASKS:\n' +
-        '1) Compute the TOTAL "leakage" — money spent purely on M-PESA charges: every f (send/Paybill/agent/ATM costs), Fuliza access fees & interest (p contains FULIZA or t=fee), and airtime purchase costs.\n' +
-        '2) Give 2-4 short breakdown lines with KES amounts (Transaction costs · Fuliza fees/interest · Agent/ATM charges as applicable).\n' +
-        '3) End with ONE concrete saving tip including an estimated KES saving for next month.\n' +
-        'Format EXACTLY:\nTotal 30-day leakage: KES X\n• line\n• line\nTip: ...\n' +
-        'Plain text only, under 90 words.';
+        '1) Restate the TOTAL lifetime leakage in KES and its share vs typical M-PESA spend (one line).\n' +
+        '2) Name the most expensive year and month, and whether fees are rising or falling across recent months.\n' +
+        '3) One line on Fuliza usage share.\n' +
+        '4) End with ONE concrete saving tip including an estimated KES saving for next month.\n' +
+        'Format EXACTLY:\nTotal lifetime leakage: KES X\n• line\n• line\n• line\nTip: ...\n' +
+        'Plain text only, under 100 words.';
 
       const res = await callGemini(prompt, { temperature: 0.15, maxOutputTokens: 700 });
 
@@ -1711,7 +1808,7 @@
           `<p class="ai-panel-text">${escapeHtml(res.text).replace(/\n/g, '<br>')}</p>`;
       } else {
         // Graceful degradation: local arithmetic, plus an honest toast
-        renderLeakageLocal(resultEl, rows,
+        renderLeakageLocal(resultEl,
           '<p class="ai-panel-note">Gemini unreachable — computed locally from your parsed fee fields.</p>');
         toastGeminiFailure(res);
       }
@@ -1771,14 +1868,19 @@
 
       sendBtn.disabled = true;
 
+      const summary = aiLedgerSummary();
       const prompt =
-        'You are the user’s private M-PESA wallet assistant (Kenya, currency KES). ' +
-        'Answer the question using ONLY the JSON transaction history below. ' +
-        'Each entry: d=date&time, t=type, c=category, p=counterparty, a=amount KES, f=fee KES.\n' +
-        'Rules: compute totals exactly; format amounts like "KES 1,250"; dates in d are DD/MM/YY HH:MM AM/PM; ' +
-        'if several people share a first name, say which names matched; if the data is insufficient, state plainly what is missing. ' +
+        'You are the user’s private M-PESA wallet assistant (Kenya, currency KES).\n' +
+        'You are given (A) a COMPLETE statistical summary of the ENTIRE ledger — every transaction from ' +
+        (summary.coverage.from || '?') + ' to ' + (summary.coverage.to || '?') + ' (' + summary.coverage.transactions + ' records), ' +
+        'bucketed by year, month, category and counterparty, INCLUDING per-period fees and Fuliza — and (B) the raw newest 100 rows for day-level detail.\n' +
+        'RULES: answer ANY year/month/category/person/fee/Fuliza question from (A) — it covers the WHOLE history, so NEVER claim a period has no data if the summary covers it. ' +
+        'Compute totals exactly; format amounts like "KES 1,250"; say when a total spans several years; if several people share a first name, say which names matched; ' +
+        'only if BOTH (A) and (B) genuinely lack the granularity asked, state plainly what is missing. ' +
         'Max 100 words. Plain text only.\n' +
-        'HISTORY: ' + JSON.stringify(aiSnapshot(db, 140)) + '\nQUESTION: ' + question;
+        'SUMMARY: ' + JSON.stringify(summary) + '\n' +
+        'RECENT ROWS (newest 100, d=date&time t=type c=category p=counterparty a=amount f=fee): ' + JSON.stringify(aiSnapshot(db, 100)) + '\n' +
+        'QUESTION: ' + question;
 
       const res = await callGemini(prompt, { temperature: 0.25, maxOutputTokens: 800 });
 
