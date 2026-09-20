@@ -1988,3 +1988,88 @@ html, body { transition: none; }
 
 /* ── 4. Typing dots + dock pop reduced-motion cleanup already present;
        ensure the view-enter still feels fluid without stacked children ── */
+
+/* ===========================================================
+   v5.1 — RESTORE v3.1.0 INTERACTION FEEL
+   v4.4's motion layer (view-enter animations, press transforms,
+   dock pops, drifting gels) taxed every touch: each tap forced
+   the whole frosted stack — now hundreds of rows after deep scan —
+   to re-composite before feedback landed ("load long, then snap").
+   This block removes ALL of it and reproduces exactly the v3.1.0
+   interaction model, with GPU cost where it actually pays off.
+   =========================================================== */
+
+/* Tab switch: exactly the v3.1.0 behavior (children rise once) — the
+   whole-view transform animation that re-drew every blurred card
+   per frame is dead. */
+.app-tab-view.is-active { animation: none !important; }
+.app-tab-view.is-active > * { animation: v3-rise .35s cubic-bezier(.2, .8, .2, 1) both; }
+
+/* Rows: back to the v3.1.0 simple hover tint — no press scaling that
+   forced the parent glass list to re-blur on every tap. */
+.tx { transition: background-color .15s ease !important; }
+.tx:active { transform: none !important; }
+
+/* Round buttons: v3.1.0 = no transform, no transition tax. */
+.icon-btn-round { transition: none !important; }
+.icon-btn-round:active { transform: none !important; }
+
+/* Dock: v3.1.0 = quiet color/state swap, no spring pop. */
+.dock-item { transition: background-color .18s ease, color .18s ease !important; }
+.dock-item:active { transform: none !important; }
+.dock-item.is-active { animation: none !important; transform: none !important; }
+
+/* Left-over micro-transitions from v4.4 */
+.stat strong, .mini-stat-val, .balance-amount { transition: none !important; }
+.theme-seg-btn { transition: background-color .18s ease, color .18s ease !important; }
+.theme-seg-btn:active { transform: none !important; }
+body::before { animation: none !important; will-change: auto !important; }
+
+/* Busy pulse moved off the frosted button onto its TEXT label —
+   animating a whole blurred button repaints it every frame. */
+.btn-loading { animation: none !important; }
+.btn-loading span { animation: v5-label-pulse 1.4s ease-in-out infinite; }
+@keyframes v5-label-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
+}
+
+/* THE BIG ONE: heavy repeated surfaces go SOLID (no backdrop-filter).
+   After deep scan there are hundreds of transaction rows/groups on a
+   single tab — frosted, they re-blur on every touch and scroll frame.
+   Glass stays where it pays: single top-level cards (hero, summary,
+   settings, dashboard list, dock, modals). Solid colors are tuned to
+   keep the translucent look at a glance. */
+.tx-group, .tx-list, .chat-bubble {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+.tx-list { background: transparent; }
+
+/* Dashboard's lone recent list keeps the glass (one card, 15 rows max) */
+#dashboardTxList {
+  background: var(--app-surface) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.5) !important;
+  backdrop-filter: blur(24px) saturate(1.5) !important;
+}
+
+/* Solid-but-glassy accordion surfaces per theme */
+.tx-group { background: rgba(255, 255, 255, .93) !important; }
+.tx-group-header { background: rgba(244, 246, 250, .96); }
+[data-theme="dark"] .tx-group { background: rgba(24, 29, 38, .94) !important; }
+[data-theme="dark"] .tx-group-header { background: rgba(30, 36, 46, .96); }
+[data-theme="amoled"] .tx-group { background: rgba(14, 15, 19, .96) !important; }
+[data-theme="amoled"] .tx-group-header { background: rgba(20, 21, 26, .96); }
+
+/* Solid chat bubbles keep their look without blur cost */
+.chat-bubble--ai { background: var(--app-surface-2); }
+#leakageResult.ai-panel {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Reduced-motion users: nothing to begin with, belt & braces */
+@media (prefers-reduced-motion: reduce) {
+  .app-tab-view.is-active > * { animation: none !important; }
+  .btn-loading span, .chat-typing i { animation: none !important; }
+}

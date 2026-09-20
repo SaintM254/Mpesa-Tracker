@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag (e.g. v5.0)"
+        description: "Release tag (e.g. v5.1)"
         required: true
-        default: "v5.0"
+        default: "v5.1"
       release_name:
         description: "Release display name"
         required: true
-        default: "M-PESA Tracker v5.0"
+        default: "M-PESA Tracker v5.1"
   push:
     branches: [main, 'arena/**']
 
@@ -219,21 +219,19 @@ jobs:
           # the tag silently lands on the default branch's HEAD instead.
           target_commitish: ${{ github.sha }}
           body: |
-            ## M-PESA Tracker v5.0 — Android APK
+            ## M-PESA Tracker v5.1 — Android APK
 
-            ### 🛠 v4.4 regressions fixed first
-            - **Scrolling restored**: v4.4's animated ambient layer forced every frosted card to re-blur on every frame — that's why scrolling froze. The ambient gels are now static; scroll is instant again. Theme switching is a one-frame snap instead of a choppy cross-fade; the hijacking smooth-scroll flag is gone.
-            
-            ### 🔍 Deep inbox scanning (the real "5 transactions" fix)
-            - Scans used to read only the newest **500 rows of the entire SMS inbox** (all senders) — for a busy phone that's barely a month, so July showed 5 items. v5.0 walks the **whole inbox in offset pages right back to your first-ever M-PESA message**.
-            - The **Sync** button now runs this deep scan with live progress ("Scanning… 214 found"), and the first permission grant imports the full history too.
-            - **Broader message-reading skill**: handles *"Transaction cost was Ksh…"* variants, *"deposited"* / *"transferred to"* phrasing, and 2–4 digit years — All-Transactions groups every month back to day one.
+            ### ⚡ One job: restore the v3.1.0 interaction feel
+            Your touches queued then snapped because v4.4 stacked motion effects (whole-view enter animations, press-scales, dock pops) on top of a glass UI that — thanks to your request to deep-scan — now renders **hundreds of frosted rows**. Every tap forced the entire blurred stack to re-composite before the app could respond.
 
-            ### 🌙 New theme system
-            - The sun/moon quick-toggle in the top bar is **removed** — theme control lives in Settings only, as an Apple-style **3-way segmented control**.
-            - **New third option: AMOLED** — pure `#000` canvas for OLED battery saving. Per your accessibility note, every green **text** element (income amounts, links, totals, pills) renders **bold white** on AMOLED; green stays only as filled icon/button surfaces.
+            **v5.1 removes the entire tax:**
+            - Whole-view transition animations: **gone** — tab switch is exactly the v3.1.0 single gentle content-rise.
+            - Press-scale transforms on rows and round buttons: **gone** — back to the v3.1.0 quiet hover tint.
+            - Dock spring pop on every tab change: **gone** — quiet active-state swap.
+            - The big one: repeated surfaces (transaction groups, row lists, chat bubbles) are now **solid instead of frosted**, tuned to look the same at a glance. Glass/blur remains only on the few top-level cards (hero, summary, settings, dashboard list, dock, modals) — where one blur is cheap. Hundreds of rows no longer re-blur on every touch or scroll frame.
+            - The AI busy pulse animates the label text instead of a whole frosted button.
 
-            Everything else (typing-dots AI loader, live Gemini chain, pill dock, typing animations) is unchanged. Installs on top — pinned signature.
+            Everything stays (deep scan, AMOLED theme, typing-dots loader, live Gemini chain). Installs on top — pinned signature.
 
             SHA-256 checksums are in `SHA256SUMS.txt`.
           draft: false

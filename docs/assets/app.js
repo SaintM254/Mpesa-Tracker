@@ -2,7 +2,7 @@
   'use strict';
 
   // ========================================================
-  // M-PESA TRACKER v5.0 — OFFLINE-FIRST M-PESA SMS ENGINE
+  // M-PESA TRACKER v5.1 — OFFLINE-FIRST M-PESA SMS ENGINE
   // Zero-mock ledger · SAF CSV export · optional Gemini AI · photo cropping
   // Glassmorphism UI · Floating pill dock · Apple-style polish
   // Gemini model fallback · Fees & Fuliza leakage audit · Wallet chat
