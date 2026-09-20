@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag (e.g. v1.0.0)"
+        description: "Release tag (e.g. v1.1.0)"
         required: true
-        default: "v1.0.0"
+        default: "v1.1.0"
       release_name:
         description: "Release display name"
         required: true
-        default: "M-PESA Tracker v1.0.0"
+        default: "M-PESA Tracker v1.1.0"
       upload_release:
         description: "Publish a GitHub release for this build?"
         type: boolean
@@ -22,7 +22,6 @@ permissions:
   contents: write
   issues: write
 
-# Concurrency so runs don't fight each other
 concurrency:
   group: release
   cancel-in-progress: true
@@ -48,12 +47,6 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # ---- Keystore handling ----
-      # Prefer a long-lived keystore stored as a repo secret so successive
-      # releases are signed with the same identity. If no secret is configured
-      # yet, generate a fresh keystore just for this build (works, but each
-      # build will be a different signing identity until the user commits the
-      # keystore into repo secrets).
       - name: Prepare signing keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -62,8 +55,6 @@ jobs:
           KEY_PASS:        ${{ secrets.KEY_PASS }}
         run: |
           set -e
-          # The app module looks for the keystore at `signing/release.jks`
-          # relative to android/app/, so we write it into android/app/signing/.
           mkdir -p android/app/signing
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "Using signing keystore from KEYSTORE_BASE64 secret."
@@ -92,35 +83,24 @@ jobs:
           ls -lh android/app/signing/release.jks
 
       - name: Install Capacitor deps
-        run: npm install --no-audit --no-fund
+        run: npm ci
 
       - name: Sync web build into Android
         id: sync
         run: |
           set -e
-          set -o pipefail
-          echo "=== Diagnostics ==="
-          node --version
-          npx --version
-          echo "--- Capacitor installed version ---"
-          npx cap --version || true
-          echo "--- Files in android project ---"
-          ls -la android/
-          echo "--- Files in docs ---"
-          ls -la docs/ docs/assets/
-          echo "--- Running cap sync ---"
-          if ! npx cap sync android 2>&1 | tee /tmp/cap-sync.log; then
-            echo "::error::cap sync failed"
-            exit 1
-          fi
-          echo "=== Sync exit OK ==="
-        shell: bash
+          echo "=== Node & npm versions ==="
+          node -v
+          npm -v
+          echo "=== Running cap sync ==="
+          npx cap sync android 2>&1 | tee /tmp/cap-sync.log
 
       - name: Build signed release APK
         id: gradle
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon --warning-mode=summary 2>&1 | tee /tmp/gradle.log
-        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --warning-mode=summary 2>&1 | tee /tmp/gradle.log
 
       - name: Locate APK
         id: locate
@@ -144,7 +124,8 @@ jobs:
         run: |
           mkdir -p release
           cp "android/${{ steps.locate.outputs.apk_path }}" release/app-release.apk
-          sha256sum release/app-release.apk > release/SHA256SUMS.txt
+          (cd release && sha256sum app-release.apk > SHA256SUMS.txt)
+          cat release/SHA256SUMS.txt
           ls -lh release/
 
       - name: Upload artefacts
@@ -154,7 +135,6 @@ jobs:
           path: release/
           if-no-files-found: error
 
-      # ---- Failure diagnostics: post log to a GitHub issue ----
       - name: Post failure log to GitHub issue
         if: failure()
         env:
@@ -165,23 +145,27 @@ jobs:
             echo
             echo "**Branch:** ${{ github.ref_name }}"
             echo "**Commit:** ${{ github.sha }}"
-            echo "**Run:** ${{ github.html_url }}"
+            echo "**Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             echo
-            echo '<details><summary>cap sync log</summary>'
-            echo
-            echo '```'
-            tail -c 60000 /tmp/cap-sync.log 2>/dev/null || echo '(no log)'
-            echo '```'
-            echo
-            echo '</details>'
-            echo
-            echo '<details><summary>gradle log (tail)</summary>'
-            echo
-            echo '```'
-            tail -c 60000 /tmp/gradle.log 2>/dev/null || echo '(no log)'
-            echo '```'
-            echo
-            echo '</details>'
+            if [ -f /tmp/cap-sync.log ]; then
+              echo '<details><summary>cap sync log</summary>'
+              echo
+              echo '```'
+              tail -c 60000 /tmp/cap-sync.log 2>/dev/null || echo '(no log)'
+              echo '```'
+              echo
+              echo '</details>'
+              echo
+            fi
+            if [ -f /tmp/gradle.log ]; then
+              echo '<details><summary>gradle log (tail)</summary>'
+              echo
+              echo '```'
+              tail -c 60000 /tmp/gradle.log 2>/dev/null || echo '(no log)'
+              echo '```'
+              echo
+              echo '</details>'
+            fi
           } > /tmp/body.md
 
           gh api \
@@ -194,8 +178,6 @@ jobs:
   release:
     name: Publish GitHub Release
     needs: build
-    # Publish on push to main (with an automatic date-tagged release) or when
-    # the user runs the workflow manually with upload_release=true.
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && inputs.upload_release == 'true')
@@ -217,7 +199,7 @@ jobs:
             TAG="$INPUT_TAG"
           else
             SHA="$(echo "${{ github.sha }}" | cut -c1-7)"
-            TAG="v0.0.0+${SHA}-$(date -u +%Y%m%d-%H%M)"
+            TAG="v1.1.0+${SHA}-$(date -u +%Y%m%d-%H%M)"
           fi
           if [ -n "$INPUT_NAME" ]; then NAME="$INPUT_NAME"; else NAME="M-PESA Tracker $TAG"; fi
           echo "tag=$TAG"  >> "$GITHUB_OUTPUT"
@@ -229,20 +211,26 @@ jobs:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.name }}
           body: |
-            ## M-PESA Tracker — Android APK
+            ## M-PESA Tracker v1.1.0 — Android APK
 
-            Offline, private M-PESA transaction tracker wrapped as a Capacitor
-            WebView app pointing at the `/docs` landing page / app shell.
+            ### 🚀 New Release: Dedicated In-App Dashboard
+            This update turns the APK into the **exact interactive application displayed on the mockup**:
+            - **Header & Greeting**: Good morning, Brian Otieno with interactive profile customization.
+            - **Balance Card**: Total spent (KSh 14,820), percentage trend vs previous month, and weekly activity bar graph.
+            - **Interactive Dock Navigation**:
+              - 📊 **Dashboard**: Recent transactions (Java House Westlands, Matatu, Airtime, Salary, KPLC tokens).
+              - 📈 **Analytics**: Category spend breakdown with live progress bars (Food, Transport, Utilities, Airtime, Shopping, Rent).
+              - ➕ **SMS Parser & Simulator**: Paste any Safaricom M-PESA SMS text or test with sample confirmations to parse reference code, amount, counterparty, and auto-categorize in real-time.
+              - 🏷️ **Categories**: Color-coded category breakdown cards with count and expense sums.
+              - ⚙️ **Settings**: Material You Light / Dark theme switch, custom user profile, CSV ledger export, and demo reset.
+            - **100% Offline**: Zero internet permissions declared in `AndroidManifest.xml`. Data is securely stored in local storage on device.
 
-            ### Install
+            ### Installation:
             1. Download `app-release.apk` below.
-            2. On your phone, allow *Install unknown apps* for the browser you used.
-            3. Open the APK and tap **Install**.
+            2. Tap **Install** (allow *Install unknown apps* for your browser if prompted).
+            3. Enjoy full offline M-PESA expenditure tracking.
 
-            **Compatibility:** Android 8.0+
-            **File size:** ~6 MB
-            **Permissions:** none beyond standard WebView runtime.
-            **SHA-256:** see `SHA256SUMS.txt` next to the APK.
+            SHA-256 checksums are in `SHA256SUMS.txt`.
           draft: false
           prerelease: false
           files: |
