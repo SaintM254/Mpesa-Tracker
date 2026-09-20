@@ -1,9 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Permissions to read SMS on device and catch incoming SMS -->
+    <!-- SMS tracking -->
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
+
+    <!-- Internet is used ONLY for the optional Gemini AI statement export.
+         Every other feature works fully offline. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Legacy storage access for CSV export (Android 9 and below only).
+         Android 10+ uses the Storage Access Framework with no permission. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <application
         android:allowBackup="true"

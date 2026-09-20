@@ -2,8 +2,8 @@
   'use strict';
 
   // ========================================================
-  // M-PESA TRACKER v2.0.0 — OFFLINE M-PESA SMS EXPENSE ENGINE
-  // Zero-mock: the app always starts on a clean, empty ledger.
+  // M-PESA TRACKER v2.1.0 — OFFLINE-FIRST M-PESA SMS ENGINE
+  // Zero-mock ledger · SAF CSV export · optional Gemini AI · photo cropping
   // ========================================================
 
   const STORAGE_KEY_TX = 'mpesa_tracker_tx_db_v4'; // fresh namespace: no legacy mock data
@@ -11,8 +11,11 @@
   const STORAGE_KEY_USER = 'mpesa_tracker_user_name';
   const STORAGE_KEY_RULES = 'mpesa_tracker_cat_rules';
   const STORAGE_KEY_PERM_DISMISSED = 'mpesa_tracker_perm_dismissed';
+  const STORAGE_KEY_PHOTO = 'mpesa_tracker_user_photo';
+  const STORAGE_KEY_GEMINI = 'mpesa_tracker_gemini_key';
 
   const DEFAULT_USER_NAME = 'M-PESA User';
+  const GEMINI_MODEL = 'gemini-2.5-flash';
 
   // ========================================================
   // INLINE SVG ICON SYSTEM (no webfont — crisp vectors, zero text bleed)
@@ -291,6 +294,13 @@
   function getSmsPlugin() {
     if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SmsPlugin) {
       return window.Capacitor.Plugins.SmsPlugin;
+    }
+    return null;
+  }
+
+  function getExportPlugin() {
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ExportPlugin) {
+      return window.Capacitor.Plugins.ExportPlugin;
     }
     return null;
   }
@@ -898,8 +908,8 @@
       const safe = name.trim() || DEFAULT_USER_NAME;
       if (nameEl) nameEl.textContent = safe;
       if (inputEl) inputEl.value = safe;
-      const initials = safe.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'MU';
-      if (avatarEl) avatarEl.textContent = initials;
+      currentInitials = safe.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'MU';
+      renderAvatar(); // shows the stored photo if one exists, else initials
       localStorage.setItem(STORAGE_KEY_USER, safe);
     }
 
@@ -934,30 +944,76 @@
     if (seeAll) seeAll.addEventListener('click', () => switchTab('view-analytics'));
   }
 
+  // ========================================================
+  // CSV EXPORT (native Storage Access Framework + browser fallback)
+  // ========================================================
+  function buildCsvText() {
+    let csv = 'Code,Type,Category,Counterparty,Amount (KSh),Balance (KSh),Cost (KSh),Date\n';
+    db.forEach(t => {
+      csv += `"${t.code || ''}","${t.type || ''}","${t.category || ''}","${(t.counterparty || '').replace(/"/g, '""')}",${t.amount || 0},${t.balance !== null ? t.balance : ''},${t.cost !== null ? t.cost : ''},"${t.datetime || ''}"\n`;
+    });
+    return csv;
+  }
+
+  // Saves CSV: in the APK it pops the Android file manager (document picker)
+  // so the user chooses the folder; in a plain browser it downloads the blob.
+  async function saveCsvEverywhere(fileName, contents) {
+    const plugin = getExportPlugin();
+    if (plugin) {
+      try {
+        const perm = await plugin.requestStorageAccess();
+        if (!perm || !perm.granted) {
+          showToast('Storage permission denied — CSV was not saved.');
+          return false;
+        }
+      } catch (_) { /* storage permission not needed on this Android version */ }
+
+      try {
+        const res = await plugin.saveCsvToStorage({ fileName, contents });
+        if (res && res.saved) {
+          showToast(`Saved ${fileName} to the location you picked.`);
+          return true;
+        }
+        showToast('Save cancelled — no file written.');
+        return false;
+      } catch (e) {
+        showToast('Could not save the CSV file.');
+        return false;
+      }
+    }
+
+    // Browser fallback: classic blob download
+    try {
+      const blob = new Blob([contents], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`Downloaded ${fileName}.`);
+      return true;
+    } catch (e) {
+      showToast('Could not save the CSV file.');
+      return false;
+    }
+  }
+
+  function todaySlug() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
   function initSettingsActions() {
     const exportBtn = document.getElementById('exportCsvBtn');
     if (exportBtn) {
-      exportBtn.addEventListener('click', () => {
+      exportBtn.addEventListener('click', async () => {
         if (!db.length) {
-          showToast('No transactions to export.');
+          showToast('No transactions to export yet. Sync your SMS inbox first.');
           return;
         }
-
-        let csv = 'Code,Type,Category,Counterparty,Amount (KSh),Balance (KSh),Cost (KSh),Date\n';
-        db.forEach(t => {
-          csv += `"${t.code || ''}","${t.type || ''}","${t.category || ''}","${(t.counterparty || '').replace(/"/g, '""')}",${t.amount || 0},${t.balance !== null ? t.balance : ''},${t.cost !== null ? t.cost : ''},"${t.datetime || ''}"\n`;
-        });
-
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `mpesa-statement-${new Date().toISOString().slice(0, 10)}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showToast('CSV statement exported.');
+        await saveCsvEverywhere(`mpesa-ledger-${todaySlug()}.csv`, buildCsvText());
       });
     }
 
@@ -980,6 +1036,289 @@
     if (modalClose && modal) {
       modalClose.addEventListener('click', () => modal.classList.remove('is-open'));
     }
+  }
+
+  // ========================================================
+  // GEMINI AI REPORT (optional — the app's only online feature)
+  // ========================================================
+  function initAiExport() {
+    const keyInput = document.getElementById('geminiKeyInput');
+    const aiBtn = document.getElementById('exportAiBtn');
+    const aiLabel = document.getElementById('exportAiLabel');
+    const aiIcon = document.getElementById('exportAiIcon');
+
+    if (keyInput) {
+      keyInput.value = localStorage.getItem(STORAGE_KEY_GEMINI) || '';
+      keyInput.addEventListener('change', () => {
+        localStorage.setItem(STORAGE_KEY_GEMINI, keyInput.value.trim());
+        showToast(keyInput.value.trim() ? 'Gemini API key saved on this device.' : 'Gemini API key removed.');
+      });
+    }
+
+    if (!aiBtn) return;
+
+    aiBtn.addEventListener('click', async () => {
+      const key = (localStorage.getItem(STORAGE_KEY_GEMINI) || '').trim();
+      if (!key) {
+        showToast('Add your Gemini API key above first — AI reports are optional.');
+        if (keyInput) keyInput.focus();
+        return;
+      }
+      if (!db.length) {
+        showToast('No transactions to analyze yet. Sync your SMS inbox first.');
+        return;
+      }
+
+      // Compact, anonymized-agnostic payload (codes + parties are yours; stays
+      // between your device and Google's API using your own key).
+      const rows = db.slice(0, 150).map(t => ({
+        type: t.type, category: t.category,
+        counterparty: t.counterparty, amount: t.amount,
+        cost: t.cost, date: t.datetime
+      }));
+
+      const prompt =
+        'You are a personal-finance CSV generator. Here is my M-PESA transaction ledger as JSON:\n' +
+        JSON.stringify(rows) +
+        '\n\nProduce a UTF-8 CSV report with EXACTLY these sections in order:\n' +
+        '1) Header row: Section,Month,Category,Transactions Count,Total (KSh),Share of Spend %,Insight\n' +
+        '2) One row per category per calendar month summarized from the data (Section=Monthly)\n' +
+        '3) Total rows per month (Section=Total)\n' +
+        '4) A final overall row (Section=Overall)\n' +
+        'The Insight column gets a short practical tip (max 12 words). ' +
+        'Use plain numbers without thousands separators inside the CSV. ' +
+        'Respond with ONLY the CSV content — no commentary, no markdown fences.';
+
+      aiBtn.disabled = true;
+      if (aiLabel) aiLabel.textContent = 'Generating…';
+      if (aiIcon) aiIcon.classList.add('ic-spin');
+
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 30000);
+        const resp = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(key)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
+            })
+          }
+        );
+        clearTimeout(timer);
+
+        if (!resp.ok) {
+          if (resp.status === 400 || resp.status === 403) {
+            showToast('Gemini rejected the API key. Check it in AI Studio.');
+          } else if (resp.status === 429) {
+            showToast('Gemini quota exhausted — try again later.');
+          } else {
+            showToast(`Gemini error ${resp.status}. Check your internet connection.`);
+          }
+          return;
+        }
+
+        const data = await resp.json();
+        let text = (((data.candidates || [])[0] || {}).content || {}).parts;
+        text = (text && text[0] && text[0].text) ? text[0].text.trim() : '';
+        // Strip stray markdown fences the model may add
+        text = text.replace(/^```[a-z]*\s*/i, '').replace(/```\s*$/, '').trim();
+
+        if (!text || !/^["A-Za-z]/.test(text)) {
+          showToast('Gemini returned an unusable response. Try again.');
+          return;
+        }
+
+        await saveCsvEverywhere(`mpesa-ai-report-${todaySlug()}.csv`, text);
+      } catch (e) {
+        if (e && e.name === 'AbortError') {
+          showToast('Gemini request timed out. Check your internet connection.');
+        } else {
+          showToast('AI report needs an internet connection. Everything else works offline.');
+        }
+      } finally {
+        aiBtn.disabled = false;
+        if (aiLabel) aiLabel.textContent = 'Generate AI Report CSV';
+        if (aiIcon) aiIcon.classList.remove('ic-spin');
+      }
+    });
+  }
+
+  // ========================================================
+  // PROFILE PHOTO (upload → crop circle → localStorage)
+  // ========================================================
+  let currentInitials = 'MU';
+
+  function renderAvatar() {
+    const stored = localStorage.getItem(STORAGE_KEY_PHOTO);
+    const els = [document.getElementById('avatarBtn'), document.getElementById('settingsAvatarPreview')];
+    els.forEach(el => {
+      if (!el) return;
+      if (stored) {
+        el.innerHTML = `<img src="${stored}" alt="Profile photo" />`;
+      } else {
+        el.textContent = currentInitials;
+      }
+    });
+    const removeBtn = document.getElementById('removePhotoBtn');
+    if (removeBtn) removeBtn.style.display = stored ? 'inline-flex' : 'none';
+  }
+
+  function initProfilePhoto() {
+    const photoInput = document.getElementById('photoInput');
+    const changeBtn = document.getElementById('changePhotoBtn');
+    const removeBtn = document.getElementById('removePhotoBtn');
+    const avatarBtn = document.getElementById('avatarBtn');
+    const modal = document.getElementById('photoModal');
+
+    if (avatarBtn) {
+      avatarBtn.addEventListener('click', () => {
+        if (photoInput) photoInput.click();
+      });
+    }
+    if (changeBtn && photoInput) {
+      changeBtn.addEventListener('click', () => photoInput.click());
+    }
+    if (removeBtn) {
+      removeBtn.addEventListener('click', () => {
+        localStorage.removeItem(STORAGE_KEY_PHOTO);
+        renderAvatar();
+        showToast('Profile photo removed.');
+      });
+    }
+
+    if (!photoInput || !modal) return;
+
+    // --- Crop session state ---
+    const viewport = document.getElementById('cropViewport');
+    const img = document.getElementById('cropImage');
+    const zoom = document.getElementById('cropZoom');
+    const saveBtn = document.getElementById('cropSaveBtn');
+    const cancelBtn = document.getElementById('cropCancelBtn');
+    const V = 240; // viewport css px (must match .crop-viewport)
+    let crop = null; // {nw, nh, base, scale, cx, cy}
+
+    function applyTransform() {
+      if (!crop) return;
+      img.style.transform = `translate(${crop.cx}px, ${crop.cy}px) scale(${crop.scale})`;
+    }
+
+    function clampPan() {
+      if (!crop) return;
+      const w = crop.nw * crop.scale;
+      const h = crop.nh * crop.scale;
+      crop.cx = Math.min(0, Math.max(V - w, crop.cx));
+      crop.cy = Math.min(0, Math.max(V - h, crop.cy));
+    }
+
+    photoInput.addEventListener('change', () => {
+      const file = photoInput.files && photoInput.files[0];
+      if (!file) return;
+      if (!/^image\//.test(file.type)) {
+        showToast('Please choose an image file.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        const probe = new Image();
+        probe.onload = () => {
+          crop = {
+            nw: probe.naturalWidth,
+            nh: probe.naturalHeight,
+            base: Math.max(V / probe.naturalWidth, V / probe.naturalHeight),
+            scale: 1, cx: 0, cy: 0
+          };
+          crop.scale = crop.base;
+          crop.cx = (V - crop.nw * crop.scale) / 2;
+          crop.cy = (V - crop.nh * crop.scale) / 2;
+          img.src = dataUrl;
+          if (zoom) zoom.value = 100;
+          applyTransform();
+          clampPan();
+          modal.classList.add('is-open');
+        };
+        probe.onerror = () => showToast('Could not read that image.');
+        probe.src = dataUrl;
+      };
+      reader.readAsDataURL(file);
+      photoInput.value = '';
+    });
+
+    // Drag to pan (pointer events cover mouse + touch)
+    let dragging = null;
+    if (viewport) {
+      viewport.addEventListener('pointerdown', e => {
+        if (!crop) return;
+        dragging = { x: e.clientX, y: e.clientY, cx: crop.cx, cy: crop.cy };
+        viewport.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      });
+      viewport.addEventListener('pointermove', e => {
+        if (!dragging || !crop) return;
+        crop.cx = dragging.cx + (e.clientX - dragging.x);
+        crop.cy = dragging.cy + (e.clientY - dragging.y);
+        clampPan();
+        applyTransform();
+      });
+      const stop = () => { dragging = null; };
+      viewport.addEventListener('pointerup', stop);
+      viewport.addEventListener('pointercancel', stop);
+    }
+
+    // Zoom slider (100% = cover viewport), anchored at viewport center
+    if (zoom) {
+      zoom.addEventListener('input', () => {
+        if (!crop) return;
+        const newScale = crop.base * (Number(zoom.value) / 100);
+        const midX = (V / 2 - crop.cx) / crop.scale; // content point at viewport center
+        const midY = (V / 2 - crop.cy) / crop.scale;
+        crop.scale = newScale;
+        crop.cx = V / 2 - midX * newScale;
+        crop.cy = V / 2 - midY * newScale;
+        clampPan();
+        applyTransform();
+      });
+    }
+
+    function closeModal() {
+      modal.classList.remove('is-open');
+      crop = null;
+      img.removeAttribute('src');
+    }
+
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
+        if (!crop) return;
+        const OUT = 256;
+        const canvas = document.createElement('canvas');
+        canvas.width = OUT;
+        canvas.height = OUT;
+        const ctx = canvas.getContext('2d');
+        const f = OUT / V;
+        ctx.beginPath();
+        ctx.arc(OUT / 2, OUT / 2, OUT / 2, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(img, crop.cx * f, crop.cy * f, crop.nw * crop.scale * f, crop.nh * crop.scale * f);
+        try {
+          const dataUrl = canvas.toDataURL('image/png');
+          localStorage.setItem(STORAGE_KEY_PHOTO, dataUrl);
+          renderAvatar();
+          showToast('Profile photo saved.');
+        } catch (e) {
+          showToast('Not enough storage to keep that photo.');
+        }
+        closeModal();
+      });
+    }
+
+    renderAvatar();
   }
 
   function showToast(msg) {
@@ -1022,10 +1361,12 @@
     loadDatabase();
     initTheme();
     initUser();
+    initProfilePhoto();
     renderAllViews();
     initTabs();
     initSmsTab();
     initSettingsActions();
+    initAiExport();
     initInboxSync();
     initPermissionScreen();
   });

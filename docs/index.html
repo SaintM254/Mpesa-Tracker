@@ -203,10 +203,24 @@
       <section id="view-settings" class="app-tab-view">
         <div class="view-header">
           <h3>Settings &amp; Storage</h3>
-          <p class="view-sub">100% offline device data</p>
+          <p class="view-sub">Private by default · optional AI reports</p>
         </div>
 
         <div class="settings-list">
+          <div class="settings-item">
+            <div class="settings-meta">
+              <div class="settings-avatar" id="settingsAvatarPreview">MU</div>
+              <div>
+                <strong>Profile Photo</strong>
+                <p>Tap to add &amp; crop a picture</p>
+              </div>
+            </div>
+            <div class="settings-actions">
+              <button class="btn btn-sm btn-primary" id="changePhotoBtn">Upload</button>
+              <button class="btn btn-sm btn-ghost" id="removePhotoBtn" style="display:none;">Remove</button>
+            </div>
+          </div>
+
           <div class="settings-item">
             <div class="settings-meta">
               <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -249,15 +263,35 @@
             </button>
           </div>
 
-          <div class="settings-item">
+          <!-- Export & AI reports (grouped: AI statement builds on the CSV export) -->
+          <div class="settings-item settings-item--stack">
             <div class="settings-meta">
               <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
               <div>
-                <strong>Export CSV</strong>
-                <p>Save all transactions locally</p>
+                <strong>Export &amp; Reports</strong>
+                <p>Pick the save location in your file manager</p>
               </div>
             </div>
-            <button class="btn btn-sm btn-ghost" id="exportCsvBtn">Export</button>
+            <button class="btn btn-primary btn-block" id="exportCsvBtn">
+              <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+              Export CSV
+            </button>
+
+            <div class="settings-divider"></div>
+
+            <div class="settings-meta">
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"/></svg>
+              <div>
+                <strong>AI Statement (Gemini)</strong>
+                <p>Optional · the app's only online feature</p>
+              </div>
+            </div>
+            <input type="password" id="geminiKeyInput" class="settings-input settings-input--full" placeholder="Paste Gemini API key (optional)" autocomplete="off" />
+            <button class="btn btn-ghost btn-block" id="exportAiBtn">
+              <svg class="ic ic-sm" id="exportAiIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"/></svg>
+              <span id="exportAiLabel">Generate AI Report CSV</span>
+            </button>
+            <p class="settings-note">AI rewrites your ledger into a categorized report with a monthly summary. Key is stored only on this device. Get one free at aistudio.google.com</p>
           </div>
 
           <div class="settings-item">
@@ -279,12 +313,12 @@
                 <p>M-PESA Tracker</p>
               </div>
             </div>
-            <span class="version-pill">v2.0.0</span>
+            <span class="version-pill">v2.1.0</span>
           </div>
 
           <div class="privacy-banner">
             <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            <p><strong>100% Offline:</strong> This APK declares no Internet permission and loads no remote fonts or assets. Your SMS financial records remain strictly in your device's private sandbox.</p>
+            <p><strong>Offline-first:</strong> Your SMS records stay in this device's private sandbox. CSV exports save where <em>you</em> choose via the file manager. The <strong>optional</strong> Gemini AI report is the only feature that goes online — only when you press its button, using your own key.</p>
           </div>
         </div>
       </section>
@@ -369,6 +403,42 @@
       </div>
     </div>
   </div>
+
+  <!-- Profile Photo Crop Modal -->
+  <div class="modal-backdrop" id="photoModal" role="dialog" aria-modal="true" aria-labelledby="photoModalTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon-badge">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <div>
+          <h3 id="photoModalTitle">Crop profile photo</h3>
+          <p>Drag to position · zoom with the slider</p>
+        </div>
+      </div>
+      <div class="crop-stage">
+        <div class="crop-viewport" id="cropViewport">
+          <img id="cropImage" alt="" draggable="false" />
+          <div class="crop-circle-guide"></div>
+        </div>
+        <div class="crop-zoom-row">
+          <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M8 11h6"/></svg>
+          <input type="range" id="cropZoom" min="100" max="300" value="100" step="1" />
+          <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M8 11h6M11 8v6"/></svg>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-block" id="cropSaveBtn">
+          <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+          Save Photo
+        </button>
+        <button class="btn btn-ghost btn-block" id="cropCancelBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden profile photo picker -->
+  <input type="file" id="photoInput" accept="image/*" style="display:none;" />
 
   <!-- Toast Notification Container -->
   <div id="appToast" class="app-toast" role="alert" aria-live="polite"></div>

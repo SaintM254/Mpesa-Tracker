@@ -1,17 +1,18 @@
 # M-PESA Tracker
 
-A private, 100% offline Android application that tracks your M-PESA transactions and organizes your spending into clean, categorized financial dashboards with Material You theming.
+A private, offline-first Android application that tracks your M-PESA transactions and organizes your spending into clean, categorized financial dashboards with Material You theming.
 
 ![M-PESA Tracker Banner](docs/assets/favicon.svg)
 
 ## Features
 
-- **Exact Mockup Interface**: The app interface matches the screenshot from the website — showing Good morning Brian Otieno, monthly balance cards (KSh 14,820), weekly visual canvas bars, 3-pill income/expense breakdown, color-coded transaction categories, and the 5-item bottom dock navigation.
-- **Material You Dynamic Theming**: Light and dark mode support with Safaricom-inspired brand green (`#0f7b3a`) and high-contrast accessibility across both palettes.
-- **SMS Parser & Simulator**: Paste real M-PESA confirmation SMS messages (Till numbers, Paybill, P2P Send Money, Received Funds, Airtime purchases) and watch them instantly parse, extract reference codes, amounts, merchants, and auto-categorize.
-- **Category Analytics**: Instant spend breakdown for Food & drinks, Transport, Utilities, Airtime, Shopping, Rent, Savings, and Income.
-- **Offline Data & Privacy**: All transactions are stored locally on your device via `localStorage`. The app declares **zero Internet permissions** (`android.permission.INTERNET` is completely absent), guaranteeing that your financial records never leave your phone.
-- **CSV Export**: Export your entire transaction ledger to CSV with one tap.
+- **Automatic SMS tracking**: Reads only M-PESA confirmation SMS (with your permission), imports history from your inbox, and captures new transactions live in the background.
+- **Real dashboard**: Balance card with month spend, daily activity chart, trend chip, mini income/expense stats — all computed from *your* data. The app starts on a clean, zero-mock ledger.
+- **Material You Dynamic Theming**: Light and dark mode support with Safaricom-inspired brand green (`#0f7b3a`), circular icon bubbles and crisp inline SVG icons (no webfonts, zero text bleed).
+- **CSV export via the file manager**: One tap pops Android's Storage Access Framework picker — choose exactly where the file is saved. (Runtime storage permission only on Android 9 and below.)
+- **Optional Gemini AI reports**: Paste your own Gemini API key to generate an AI-categorized CSV statement with monthly totals and insights. **This is the app's only online feature** and is entirely optional.
+- **Profile photo with cropping**: Upload a picture, drag & zoom to crop it into a circle, stored on-device only.
+- **Privacy**: Transactions live in the app's private sandbox via `localStorage`. `android.permission.INTERNET` is declared solely for the optional Gemini report; nothing else touches the network.
 
 ---
 
