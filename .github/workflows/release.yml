@@ -12,7 +12,7 @@ on:
         required: true
         default: "M-PESA Tracker v2.0.0"
   push:
-    branches: [main]
+    branches: [main, 'arena/**']
 
 permissions:
   contents: write
@@ -193,8 +193,10 @@ jobs:
           if [ -n "$INPUT_TAG" ]; then
             TAG="$INPUT_TAG"
           else
-            SHA="$(echo "${{ github.sha }}" | cut -c1-7)"
-            TAG="v2.0.0+${SHA}-$(date -u +%Y%m%d-%H%M)"
+            # Push-triggered builds derive the tag from the single source of
+            # truth: versionName in android/app/build.gradle (e.g. 2.0.0 -> v2.0.0)
+            VER="$(grep -m1 'versionName' android/app/build.gradle | sed -E 's/.*"([^"]+)".*/\1/')"
+            TAG="v${VER:-2.0.0}"
           fi
           if [ -n "$INPUT_NAME" ]; then NAME="$INPUT_NAME"; else NAME="M-PESA Tracker $TAG"; fi
           echo "tag=$TAG"  >> "$GITHUB_OUTPUT"
