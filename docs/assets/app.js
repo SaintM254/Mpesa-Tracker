@@ -2,13 +2,15 @@
   'use strict';
 
   // ========================================================
-  // M-PESA TRACKER v4.4 — OFFLINE-FIRST M-PESA SMS ENGINE
+  // M-PESA TRACKER v5.0 — OFFLINE-FIRST M-PESA SMS ENGINE
   // Zero-mock ledger · SAF CSV export · optional Gemini AI · photo cropping
   // Glassmorphism UI · Floating pill dock · Apple-style polish
   // Gemini model fallback · Fees & Fuliza leakage audit · Wallet chat
   // v3.1.1: boot hardening — isolated init steps
   // v4.4: live model chain (1.5/2.0 retired 2025-26) · typing-dots
   // loading · avatar tap inert · fluid glass motion
+  // v5.0: DEEP inbox paging (first-ever message, not last 500) · AMOLED
+  // theme w/ AA contrast · theme control lives in Settings only
   // ========================================================
 
   const STORAGE_KEY_TX = 'mpesa_tracker_tx_db_v4'; // fresh namespace: no legacy mock data
@@ -187,7 +189,9 @@
 
     // 4. Transaction Cost: "Transaction cost, Ksh7.00"
     let cost = null;
-    const costMatch = body.match(/cost[,\s]+(?:Ksh|KSh|KES)\s*([0-9,]+(?:\.\d{1,2})?)/i);
+    // Covers "Transaction cost, Ksh23.00", "Transaction cost was Ksh10.00",
+    // and spacing/case variants
+    const costMatch = body.match(/cost[^0-9]{0,12}(?:Ksh|KSh|KES)\s*([0-9,]+(?:\.\d{1,2})?)/i);
     if (costMatch) {
       cost = parseFloat(costMatch[1].replace(/,/g, ''));
     }
@@ -214,7 +218,7 @@
     let counterparty = 'M-PESA Merchant';
     let category = 'shopping';
 
-    const isReceived = /received|from|cashback/i.test(body) && !/sent to|paid to/i.test(body);
+    const isReceived = /received|deposited|cashback/i.test(body) && !/sent to|paid to/i.test(body);
     const isAirtime = /airtime/i.test(body);
     const isWithdraw = /withdraw/i.test(body);
     const isFuliza = /fuliza/i.test(body);
@@ -240,7 +244,7 @@
     } else {
       // Sent to or Paid to (Till / Paybill / P2P)
       type = 'sent';
-      const toMatch = body.match(/(?:paid to|sent to)\s+([A-Z0-9\s.,'&-]+?)(?:\s+on|\s+\d{4,}|\s+for|\s+New|\.|$)/i);
+      const toMatch = body.match(/(?:paid to|sent to|transferred to)\s+([A-Z0-9\s.,'&-]+?)(?:\s+on|\s+\d{4,}|\s+for|\s+New|\.|$)/i);
       counterparty = toMatch ? cleanCounterparty(toMatch[1]) : 'M-PESA Payment';
     }
 
@@ -363,30 +367,48 @@
     }
   }
 
-  async function scanMpesaInbox() {
+  // opts.deep=false  -> newest-page only (fast path, used at startup)
+  // opts.deep=true   -> walk offset pages of the WHOLE inbox, back to the
+  //                     very first M-PESA message ever received (v5.0)
+  // opts.onProgress -> optional (importedCount, pagesRead) progress hook
+  async function scanMpesaInbox(opts) {
     const plugin = getSmsPlugin();
     if (!plugin || inboxScanInProgress) return 0;
     inboxScanInProgress = true;
+    const deep = !!(opts && opts.deep);
+    const onProgress = (opts && typeof opts.onProgress === 'function') ? opts.onProgress : null;
+    const PAGE = 350;
+    let imported = 0;
     try {
-      const res = await plugin.readMpesaInbox({ limit: 500 });
-      if (res && res.messages && Array.isArray(res.messages)) {
-        let imported = 0;
-        res.messages.forEach(msg => {
-          const parsed = parseMpesaMessage(msg.body, msg.timestamp);
-          if (parsed) {
-            if (insertTransaction(parsed)) {
-              imported++;
-            }
-          }
-        });
-        return imported;
+      if (!deep) {
+        const res = await plugin.readMpesaInbox({ limit: 500, offset: 0 });
+        if (res && Array.isArray(res.messages)) {
+          res.messages.forEach(msg => {
+            const parsed = parseMpesaMessage(msg.body, msg.timestamp);
+            if (parsed && insertTransaction(parsed)) imported++;
+          });
+        }
+      } else {
+        // The native layer sorts the whole SMS table newest-first; hasMore
+        // stays true while a page was completely full — i.e. history goes on.
+        for (let offset = 0, guard = 0; guard < 300; guard++, offset += PAGE) {
+          const res = await plugin.readMpesaInbox({ limit: PAGE, offset });
+          if (!res || !Array.isArray(res.messages)) break;
+          res.messages.forEach(msg => {
+            const parsed = parseMpesaMessage(msg.body, msg.timestamp);
+            if (parsed && insertTransaction(parsed)) imported++;
+          });
+          if (onProgress) onProgress(imported, guard + 1);
+          if (!res.hasMore) break; // reached the oldest SMS in the inbox
+        }
       }
+      return imported;
     } catch (e) {
       // Never write message content to logs
+      return imported;
     } finally {
       inboxScanInProgress = false;
     }
-    return 0;
   }
 
   function listenForLiveSms() {
@@ -839,13 +861,15 @@
         if (modal) modal.classList.remove('is-open');
         const granted = await requestNativeSmsPermissions();
         if (granted) {
-          showToast('SMS permission granted. Importing M-PESA messages...');
+          showToast('SMS permission granted. Deep scanning your full inbox…');
           listenForLiveSms();
-          const count = await scanMpesaInbox();
+          const count = await scanMpesaInbox({ deep: true });
           renderAllViews();
-          showToast(`Imported ${count} M-PESA transaction${count === 1 ? '' : 's'}.`);
+          showToast(count > 0
+            ? `Imported ${count} M-PESA transaction${count === 1 ? '' : 's'} — full history restored.`
+            : 'No M-PESA messages found in this inbox yet.');
         } else {
-          showToast('Permission not granted. You can still paste SMS messages manually.');
+          showToast('Permission not granted. You can enable SMS access anytime from Settings.');
           if (banner) banner.style.display = 'flex';
         }
       });
@@ -902,13 +926,16 @@
         return;
       }
 
-      // Busy state
+      // Busy state + live progress while the deep scan walks the inbox
       syncBtn.disabled = true;
-      if (syncLabel) syncLabel.textContent = 'Syncing…';
+      if (syncLabel) syncLabel.textContent = 'Deep scanning…';
       if (syncIcon) syncIcon.classList.add('ic-spin');
 
       try {
-        const count = await scanMpesaInbox();
+        const count = await scanMpesaInbox({
+          deep: true,
+          onProgress: n => { if (syncLabel) syncLabel.textContent = `Scanning… ${n} found`; }
+        });
         renderAllViews();
         if (count > 0) {
           showToast(`Sync complete: ${count} new M-PESA transaction${count === 1 ? '' : 's'} imported.`);
@@ -928,34 +955,35 @@
   // ========================================================
   function initTheme() {
     const html = document.documentElement;
+    const THEMES = ['light', 'dark', 'amoled'];
 
     function apply(theme) {
+      if (!THEMES.includes(theme)) theme = 'light';
       html.setAttribute('data-theme', theme);
-      const sw = document.getElementById('themeSwitch');
-      if (sw) sw.checked = theme === 'dark';
+      // Instant pivot — no palette tween (v4.4's cross-fade caused the
+      // "choppy and awful" theme switch by re-painting every glass blur).
+      document.querySelectorAll('.theme-seg-btn').forEach(btn => {
+        btn.classList.toggle('is-active', btn.getAttribute('data-theme') === theme);
+      });
     }
 
     let t = localStorage.getItem(STORAGE_KEY_THEME);
-    if (!t) {
+    if (!t || !THEMES.includes(t)) {
       t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
     }
     apply(t);
 
-    const toggleBtn = document.getElementById('themeToggle');
-    if (toggleBtn) {
-      toggleBtn.addEventListener('click', () => {
-        const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        apply(next);
-        localStorage.setItem(STORAGE_KEY_THEME, next);
-      });
-    }
-
-    const sw = document.getElementById('themeSwitch');
-    if (sw) {
-      sw.addEventListener('change', () => {
-        const next = sw.checked ? 'dark' : 'light';
-        apply(next);
-        localStorage.setItem(STORAGE_KEY_THEME, next);
+    // The header quick-toggle was removed in v5.0 — the Settings segmented
+    // control is the single source of truth.
+    const seg = document.getElementById('themeSeg');
+    if (seg) {
+      seg.querySelectorAll('.theme-seg-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const next = btn.getAttribute('data-theme');
+          if (!THEMES.includes(next)) return;
+          apply(next);
+          localStorage.setItem(STORAGE_KEY_THEME, next);
+        });
       });
     }
   }

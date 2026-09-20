@@ -134,6 +134,7 @@ public class SmsPlugin extends Plugin {
         }
 
         int limit = call.getInt("limit", 500);
+        int offset = call.getInt("offset", 0);
         JSArray results = new JSArray();
 
         ContentResolver resolver = getContext().getContentResolver();
@@ -147,7 +148,8 @@ public class SmsPlugin extends Plugin {
         // Filter by sender containing MPESA or fetch and filter in memory
         String selection = null;
         String[] selectionArgs = null;
-        String sortOrder = Telephony.Sms.DATE + " DESC LIMIT " + limit;
+        String sortOrder = Telephony.Sms.DATE + " DESC LIMIT " + limit + " OFFSET " + offset;
+        int rawCount = 0;
 
         Cursor cursor = null;
         try {
@@ -158,6 +160,7 @@ public class SmsPlugin extends Plugin {
                 int dateIdx = cursor.getColumnIndex(Telephony.Sms.DATE);
 
                 do {
+                    rawCount++;
                     String sender = cursor.getString(addressIdx);
                     if (isMpesaSender(sender)) {
                         String body = cursor.getString(bodyIdx);
@@ -183,6 +186,8 @@ public class SmsPlugin extends Plugin {
         JSObject res = new JSObject();
         res.put("messages", results);
         res.put("count", results.length());
+        // True when the raw page was completely full → older SMS still exist
+        res.put("hasMore", rawCount >= limit);
         call.resolve(res);
     }
 }

@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag (e.g. v4.4)"
+        description: "Release tag (e.g. v5.0)"
         required: true
-        default: "v4.4"
+        default: "v5.0"
       release_name:
         description: "Release display name"
         required: true
-        default: "M-PESA Tracker v4.4"
+        default: "M-PESA Tracker v5.0"
   push:
     branches: [main, 'arena/**']
 
@@ -219,22 +219,21 @@ jobs:
           # the tag silently lands on the default branch's HEAD instead.
           target_commitish: ${{ github.sha }}
           body: |
-            ## M-PESA Tracker v4.4 — Android APK
+            ## M-PESA Tracker v5.0 — Android APK
 
-            ### 🤖 The AI fix — for real this time
-            - **True root cause**: every model in the previous fallback chain (`gemini-2.0-flash`, `gemini-1.5-flash`, `gemini-1.5-flash-8b`) has been **retired by Google** — 1.5 family in Sept 2025, the 2.0 family on 1 June 2026 — so Google always answered 404 and the graceful fallback message fired. The chain is now anchored to models alive **today**: `gemini-3.8-flash` → `gemini-3.5-flash` → `gemini-3.1-flash-lite` → `gemini-2.5-flash-lite` → `gemini-2.5-flash`, with the same clean 404 rollover.
-            - Failure toasts now include the real upstream status (e.g. `HTTP 403`) so any future outage is instantly diagnosable.
-            - Added `ACCESS_NETWORK_STATE` so the offline badge reflects true connectivity.
+            ### 🛠 v4.4 regressions fixed first
+            - **Scrolling restored**: v4.4's animated ambient layer forced every frosted card to re-blur on every frame — that's why scrolling froze. The ambient gels are now static; scroll is instant again. Theme switching is a one-frame snap instead of a choppy cross-fade; the hijacking smooth-scroll flag is gone.
+            
+            ### 🔍 Deep inbox scanning (the real "5 transactions" fix)
+            - Scans used to read only the newest **500 rows of the entire SMS inbox** (all senders) — for a busy phone that's barely a month, so July showed 5 items. v5.0 walks the **whole inbox in offset pages right back to your first-ever M-PESA message**.
+            - The **Sync** button now runs this deep scan with live progress ("Scanning… 214 found"), and the first permission grant imports the full history too.
+            - **Broader message-reading skill**: handles *"Transaction cost was Ksh…"* variants, *"deposited"* / *"transferred to"* phrasing, and 2–4 digit years — All-Transactions groups every month back to day one.
 
-            ### ✨ Look & feel
-            - **New chat loading animation**: Apple-style typing dots pulsing inside the AI bubble — the weird spinning send icon is gone (button simply rests while waiting).
-            - **Header profile photo is now display-only** — tapping it on the main pages does nothing; changing the photo remains a Settings-only action.
-            - **Fluid transitions**: every tab switch glides in with a soft rise-and-scale settle; scroll behavior is smooth; tab-presses pop with a spring.
-            - **Living glass**: the ambient pastel/aurora gels behind the frosted cards drift almost imperceptibly; taps give subtle scale feedback. All motion is GPU-composited transform/opacity only — zero JS animation libraries, still feather-light, and fully disabled when the user prefers reduced motion.
+            ### 🌙 New theme system
+            - The sun/moon quick-toggle in the top bar is **removed** — theme control lives in Settings only, as an Apple-style **3-way segmented control**.
+            - **New third option: AMOLED** — pure `#000` canvas for OLED battery saving. Per your accessibility note, every green **text** element (income amounts, links, totals, pills) renders **bold white** on AMOLED; green stays only as filled icon/button surfaces.
 
-            ### Installation:
-            1. Install `app-release.apk` on top — pinned signature, no conflicts.
-            2. Settings → Export &amp; Reports → paste your free key (aistudio.google.com) → Audit My M-PESA Fees / Chat with your Wallet now connect.
+            Everything else (typing-dots AI loader, live Gemini chain, pill dock, typing animations) is unchanged. Installs on top — pinned signature.
 
             SHA-256 checksums are in `SHA256SUMS.txt`.
           draft: false

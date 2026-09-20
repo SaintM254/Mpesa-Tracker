@@ -24,15 +24,9 @@
           <h2 class="dash-name" id="userGreeting">M-PESA User</h2>
         </div>
         <div class="topbar-actions">
-          <button id="themeToggle" class="icon-btn-round" title="Toggle theme" aria-label="Toggle theme">
-            <span class="ic-holder" data-icon="light">
-              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-            </span>
-            <span class="ic-holder" data-icon="dark">
-              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
-            </span>
-          </button>
-          <div class="dash-avatar" id="avatarBtn" title="Profile">MU</div>
+<h2 class="dash-name" id="userGreeting">M-PESA User</h2>
+        </div>
+        <div class="topbar-actions">          <div class="dash-avatar" id="avatarBtn" title="Profile">MU</div>
         </div>
       </div>
     </header>
@@ -206,21 +200,31 @@
             <input type="text" id="nameInput" value="M-PESA User" class="settings-input" />
           </div>
 
-          <div class="settings-item">
+          <div class="settings-item settings-item--stack">
             <div class="settings-meta">
               <span class="sun-moon-pair">
                 <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
                 <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
               </span>
               <div>
-                <strong>Dark Theme</strong>
-                <p>Material You dark mode</p>
+                <strong>Appearance</strong>
+                <p>AMOLED saves battery on OLED screens</p>
               </div>
             </div>
-            <label class="switch">
-              <input type="checkbox" id="themeSwitch" />
-              <span class="slider round"></span>
-            </label>
+            <div class="theme-seg" id="themeSeg" role="group" aria-label="Theme">
+              <button type="button" class="theme-seg-btn" data-theme="light">
+                <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+                Light
+              </button>
+              <button type="button" class="theme-seg-btn" data-theme="dark">
+                <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                Dark
+              </button>
+              <button type="button" class="theme-seg-btn" data-theme="amoled">
+                <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="currentColor" stroke="none"/></svg>
+                AMOLED
+              </button>
+            </div>
           </div>
 
           <div class="settings-item">
@@ -331,7 +335,7 @@
                 <p>M-PESA Tracker</p>
               </div>
             </div>
-            <span class="version-pill">v4.4</span>
+            <span class="version-pill">v5.0</span>
           </div>
 
           <div class="privacy-banner">

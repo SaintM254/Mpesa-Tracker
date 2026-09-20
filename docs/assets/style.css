@@ -1882,3 +1882,109 @@ body::before {
   }
   .tx, .icon-btn-round, .dock-item { transition: none !important; }
 }
+
+/* ===========================================================
+   v5.0 — PERFORMANCE RESTORE · 3-WAY THEME · AMOLED
+   =========================================================== */
+
+/* ── 1. Undo the v4.4 scroll/theme regressions ─────────────
+   The animated ambient layer forced every frosted card to re-blur
+   on every scroll frame (that was the "app is not scrolling"
+   culprit), and the html transition made theme switches repaint
+   the whole glass stack. Both are gone — scrolling is instant,
+   theme switching is a one-frame snap. */
+body::before { animation: none; will-change: auto; }
+html { scroll-behavior: auto; }
+html, body { transition: none; }
+.app-main-content { overscroll-behavior-y: auto; }
+
+/* ── 2. Settings segmented theme control (Apple style) ── */
+.theme-seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border-radius: 16px;
+  background: var(--app-surface-2);
+  border: 1px solid var(--app-border);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+}
+.theme-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 6px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--app-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color .18s ease, color .18s ease, transform .12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.theme-seg-btn:active { transform: scale(.96); }
+.theme-seg-btn.is-active {
+  background: var(--app-surface);
+  color: var(--app-text);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--app-border);
+}
+
+/* ── 3. AMOLED theme: pure black, high-contrast ── */
+[data-theme="amoled"] {
+  --app-bg:          #000000;
+  --app-surface:     rgba(255, 255, 255, .07);
+  --app-surface-2:   rgba(255, 255, 255, .05);
+  --app-text:        #ffffff;
+  --app-muted:       #a3adbb;
+  --app-border:      rgba(255, 255, 255, .10);
+  --app-border-subtle: rgba(255, 255, 255, .18);
+
+  /* Extremely faint gels — true-black canvas stays #000 */
+  --glow-1: rgba(34, 197, 94, .09);
+  --glow-2: rgba(196, 255, 77, .05);
+  --glow-3: rgba(56, 189, 248, .06);
+
+  --topbar-bg: rgba(0, 0, 0, .74);
+  --modal-bg:  rgba(12, 13, 16, .94);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .6), 0 4px 14px rgba(0, 0, 0, .5);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, .65), 0 16px 36px -8px rgba(0, 0, 0, .7);
+  --shadow-lg: 0 6px 16px rgba(0, 0, 0, .7), 0 24px 48px -12px rgba(0, 0, 0, .75);
+  --shadow-brand: 0 8px 24px rgba(18, 160, 86, .42);
+}
+
+/* Accessibility requirement: any GREEN TEXT becomes BOLD WHITE on AMOLED.
+   (Green fills with white icons stay; only text-level green changes.) */
+[data-theme="amoled"] .link-btn,
+[data-theme="amoled"] .category-total,
+[data-theme="amoled"] .stat--net strong,
+[data-theme="amoled"] .mini-stat--count .mini-stat-val,
+[data-theme="amoled"] .tx-amount--in {
+  color: #ffffff !important;
+  font-weight: 700;
+}
+[data-theme="amoled"] .version-pill {
+  color: #ffffff;
+  background: rgba(255, 255, 255, .10);
+  border-color: rgba(255, 255, 255, .30);
+}
+[data-theme="amoled"] .settings-meta .ic,
+[data-theme="amoled"] .privacy-banner .ic,
+[data-theme="amoled"] .modal-security-points .ic,
+[data-theme="amoled"] .sms-help-card li .ic,
+[data-theme="amoled"] .modal-icon-badge {
+  color: #ffffff;
+}
+[data-theme="amoled"] .modal-icon-badge { background: rgba(255, 255, 255, .10); }
+
+/* Income already reads on black; keep received badges legible */
+[data-theme="amoled"] .tx-amount--in { color: #ffffff !important; }
+
+/* ── 4. Typing dots + dock pop reduced-motion cleanup already present;
+       ensure the view-enter still feels fluid without stacked children ── */
