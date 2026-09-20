@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag (e.g. v3.0.0)"
+        description: "Release tag (e.g. v3.1.0)"
         required: true
-        default: "v3.0.0"
+        default: "v3.1.0"
       release_name:
         description: "Release display name"
         required: true
-        default: "M-PESA Tracker v3.0.0"
+        default: "M-PESA Tracker v3.1.0"
   push:
     branches: [main, 'arena/**']
 
@@ -219,17 +219,20 @@ jobs:
           # the tag silently lands on the default branch's HEAD instead.
           target_commitish: ${{ github.sha }}
           body: |
-            ## M-PESA Tracker v3.0.0 — Android APK
+            ## M-PESA Tracker v3.1.0 — Android APK
 
-            ### 🚀 What's new in v3.0.0
-            - **Floating pill dock**: the bottom bar no longer spans the full width of the phone. It's a compact, heavily rounded floating pill centered in the thumb zone for true one-hand operation, with a frosted-glass finish and a glowing gradient on the active tab.
-            - **Glassmorphism everywhere**: every card, sheet, banner and input is now translucent frosted glass (`backdrop-filter` blur + saturation) layered over ambient pastel gradient gels — violet/mint/peach in **light mode**, deep green/lime in **dark mode**. Both themes glass correctly.
-            - **Apple-style polish**: generous 24–30px corner radii, subtle layered shadows on **all buttons** (primary actions get a green gradient with a brand-glow shadow, danger gets its own tinted shadow), focus halos on inputs, tactile press-down physics (`scale(.96)`), a glass top app bar, frosted bottom-sheet modals, an iOS-style switch knob, and a soft rise-in animation when a tab first paints.
+            ### 🚀 What's new in v3.1.0
+            - **Optional AI enhancements (Settings only — Home stays clean)**:
+              - **Gemini 404 fixed**: the API client now uses the standard `v1beta` `generateContent` endpoint with an ordered model fallback chain (`gemini-2.0-flash` → `gemini-1.5-flash` → `gemini-1.5-flash-8b`). A 404 on a retired model rolls over cleanly; failures capture the real response body instead of the misleading *“Check your internet connection”*. Final graceful message: *“Gemini AI feature failed. Local features remain unaffected.”*
+              - **Fees & Fuliza Leakage audit**: one tap computes your 30-day M-PESA “leakage” — send/Paybill/agent costs, airtime fees, Fuliza access fees & interest — with AI savings tips. Offline or key-less? It instantly shows **local arithmetic totals** from the parsed “Transaction cost” fields instead.
+              - **Chat with your Wallet**: ask plain-English questions (“How much did I send Peter vs Jane in August?”). Gemini answers from an anonymized snapshot — only date/type/category/name/amount/fee are shared; codes, phone numbers and balances **never** leave the device.
+            - **Offline guardrails**: every AI call is wrapped in `isOnline()` + `isGeminiEnabled()` checks; an unobtrusive “AI features unavailable offline” badge appears when connectivity drops; nothing local is ever blocked.
+            - **Cleaner CSV**: columns are now `Code, Date, Time, Type, Category, Counterparty, Phone, Amount (KSh), Cost (KSh), Balance (KSh)` — date & time are **always filled** (parsed from the SMS timestamp), category shows friendly names, missing values read `-`. 100% local generation via the Android file manager (SAF).
+            - The manual “paste an SMS” field was removed from All Transactions (inbox sync remains in Settings).
 
             ### Installation:
-            1. ⚠️ Uninstall versions **older than v2.1.1** once (they were signed with per-run keys).
-            2. Download `app-release.apk` below and install — updates from v2.1.1 onward install in place.
-            3. All future versions keep the pinned signature — no more conflicts.
+            1. Download `app-release.apk` below and install on top — pinned signature, no conflicts from v2.1.1+.
+            2. AI features live in **Settings → Export &amp; Reports** and need your own free key from aistudio.google.com. Everything else is 100% offline.
 
             SHA-256 checksums are in `SHA256SUMS.txt`.
           draft: false

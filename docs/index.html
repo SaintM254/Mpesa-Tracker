@@ -104,7 +104,7 @@
 
         <!-- Transaction Feed -->
         <ul class="tx-list" id="dashboardTxList">
-          <li class="empty-state">No M-PESA transactions yet. Grant SMS access or paste a message in the Add tab.</li>
+          <li class="empty-state">No M-PESA transactions yet. Grant SMS access to start tracking.</li>
         </ul>
       </section>
 
@@ -159,36 +159,6 @@
         <div id="transactionsGroups" class="tx-groups">
           <div class="empty-state empty-state--card">No transactions yet. Sync your SMS inbox from Settings.</div>
         </div>
-
-        <!-- Manual add (formerly the Parse SMS tab) -->
-        <div class="input-card">
-          <label for="smsInputText" class="input-label">Add manually — paste an M-PESA confirmation SMS</label>
-          <textarea id="smsInputText" class="sms-textarea" rows="4" placeholder="e.g. QK73XYZ123 Confirmed. Ksh850.00 paid to JAVA HOUSE WESTLANDS on 20/9/26 at 12:42 PM. New M-PESA balance is Ksh4,120.00. Transaction cost, Ksh0.00."></textarea>
-
-          <div class="sample-chips-row">
-            <button class="sample-chip" id="sample1Btn">↳ Try: Send money SMS</button>
-            <button class="sample-chip" id="sample2Btn">↳ Try: Buy Goods (Till) SMS</button>
-            <button class="sample-chip" id="sample3Btn">↳ Try: Received money SMS</button>
-          </div>
-
-          <div class="parse-actions">
-            <button class="btn btn-primary btn-block" id="parseSmsBtn">
-              <svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"/></svg>
-              Parse &amp; Save
-            </button>
-          </div>
-        </div>
-
-        <div class="sms-help-card">
-          <h4>Supported formats</h4>
-          <ul>
-            <li><svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> Buy Goods / Till number</li>
-            <li><svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> Paybill &amp; Business Numbers (e.g. KPLC)</li>
-            <li><svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> Send Money / P2P transfers</li>
-            <li><svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> Received Money / Customer payments</li>
-            <li><svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> Safaricom Airtime &amp; Data bundles</li>
-          </ul>
-        </div>
       </section>
 
       <!-- TAB 4: CATEGORIES MANAGEMENT -->
@@ -207,7 +177,7 @@
       <section id="view-settings" class="app-tab-view">
         <div class="view-header">
           <h3>Settings &amp; Storage</h3>
-          <p class="view-sub">Private by default · optional AI reports</p>
+          <p class="view-sub">Private by default · optional AI insights</p>
         </div>
 
         <div class="settings-list">
@@ -284,18 +254,62 @@
             <div class="settings-divider"></div>
 
             <div class="settings-meta">
-              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"/></svg>
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3 1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"/></svg>
               <div>
                 <strong>AI Statement (Gemini)</strong>
                 <p>Optional · the app's only online feature</p>
               </div>
             </div>
             <input type="password" id="geminiKeyInput" class="settings-input settings-input--full" placeholder="Paste Gemini API key (optional)" autocomplete="off" />
+            <span class="ai-badge" id="aiOfflineBadge" role="status">
+              <svg class="ic ic-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m1 1 22 22"/><path d="M8.5 15.5a5 5 0 0 1 7 0"/><path d="M5 11a10 10 0 0 1 14 0"/><path d="M12 20h.01"/></svg>
+              AI features unavailable offline
+            </span>
             <button class="btn btn-ghost btn-block" id="exportAiBtn">
-              <svg class="ic ic-sm" id="exportAiIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"/></svg>
+              <svg class="ic ic-sm" id="exportAiIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3 1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"/></svg>
               <span id="exportAiLabel">Generate AI Report CSV</span>
             </button>
             <p class="settings-note">AI rewrites your ledger into a categorized report with a monthly summary. Key is stored only on this device. Get one free at aistudio.google.com</p>
+
+            <div class="settings-divider"></div>
+
+            <!-- Fees & Fuliza leakage audit -->
+            <div class="settings-meta">
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <div>
+                <strong>Fees &amp; Fuliza Leakage</strong>
+                <p>What M-PESA charges cost you in 30 days</p>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-block" id="leakageBtn">
+              <svg class="ic ic-sm" id="leakageIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+              <span id="leakageLabel">Audit My M-PESA Fees</span>
+            </button>
+            <div class="ai-panel" id="leakageResult"></div>
+
+            <div class="settings-divider"></div>
+
+            <!-- Chat with your Wallet -->
+            <div class="settings-meta">
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M9 10h.01M12 10h.01M15 10h.01"/></svg>
+              <div>
+                <strong>Chat with your Wallet</strong>
+                <p>Ask questions about your M-PESA activity</p>
+              </div>
+            </div>
+            <div class="ai-chat-log" id="chatLog"></div>
+            <div class="chat-suggest-row">
+              <button class="ai-chip" type="button" data-suggest="How much did I spend on KPLC and Water bills last month?">KPLC + Water bills</button>
+              <button class="ai-chip" type="button" data-suggest="What was my biggest expense this month?">Biggest expense?</button>
+              <button class="ai-chip" type="button" data-suggest="How much did I send versus receive this month?">Sent vs received</button>
+            </div>
+            <div class="chat-input-row">
+              <input type="text" id="chatInput" class="settings-input settings-input--full chat-input" placeholder="e.g. How much did I send Peter in August?" autocomplete="off" />
+              <button class="btn btn-primary chat-send" id="chatSendBtn" aria-label="Ask" title="Ask">
+                <svg class="ic ic-sm" id="chatSendIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+              </button>
+            </div>
+            <p class="settings-note">Only date, type, category, counterparty name, amount &amp; fee are shared with Gemini — codes, phone numbers and balances never leave this device. Everything keeps working if you're offline or skip AI entirely.</p>
           </div>
 
           <div class="settings-item">
@@ -317,12 +331,12 @@
                 <p>M-PESA Tracker</p>
               </div>
             </div>
-            <span class="version-pill">v3.0.0</span>
+            <span class="version-pill">v3.1.0</span>
           </div>
 
           <div class="privacy-banner">
             <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            <p><strong>Offline-first:</strong> Your SMS records stay in this device's private sandbox. CSV exports save where <em>you</em> choose via the file manager. The <strong>optional</strong> Gemini AI report is the only feature that goes online — only when you press its button, using your own key.</p>
+            <p><strong>Offline-first:</strong> Your SMS records stay in this device's private sandbox. CSV exports save where <em>you</em> choose via the file manager. The <strong>optional</strong> Gemini features (report, fee audit, wallet chat) are the only ones that go online — only when you press their button, using your own key.</p>
           </div>
         </div>
       </section>
@@ -344,7 +358,7 @@
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.42 0l8.58-8.58a1 1 0 0 0 0-1.42z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/></svg>
       </button>
       <button class="dock-item" data-tab="view-settings" aria-label="Settings" title="Settings">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
     </nav>
 

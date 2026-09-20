@@ -2,9 +2,10 @@
   'use strict';
 
   // ========================================================
-  // M-PESA TRACKER v3.0.0 — OFFLINE-FIRST M-PESA SMS ENGINE
+  // M-PESA TRACKER v3.1.0 — OFFLINE-FIRST M-PESA SMS ENGINE
   // Zero-mock ledger · SAF CSV export · optional Gemini AI · photo cropping
   // Glassmorphism UI · Floating pill dock · Apple-style polish
+  // Gemini model fallback · Fees & Fuliza leakage audit · Wallet chat
   // ========================================================
 
   const STORAGE_KEY_TX = 'mpesa_tracker_tx_db_v4'; // fresh namespace: no legacy mock data
@@ -16,7 +17,12 @@
   const STORAGE_KEY_GEMINI = 'mpesa_tracker_gemini_key';
 
   const DEFAULT_USER_NAME = 'M-PESA User';
-  const GEMINI_MODEL = 'gemini-2.5-flash';
+
+  // Gemini: standard v1beta endpoint + ordered fallback chain. If the primary
+  // model is retired/renamed (HTTP 404) we roll cleanly to the next one.
+  const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
+  const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'];
+  const GEMINI_TIMEOUT_MS = 30000;
 
   // ========================================================
   // INLINE SVG ICON SYSTEM (no webfont — crisp vectors, zero text bleed)
@@ -153,7 +159,8 @@
         datetime: formatFriendlyDate(fallbackTimestamp || Date.now()),
         timestamp: fallbackTimestamp || Date.now(),
         balance: null,
-        cost: null
+        cost: null,
+        phone: null
       };
     }
     const amount = parseFloat(amountMatch[1].replace(/,/g, ''));
@@ -170,6 +177,14 @@
     const costMatch = body.match(/cost[,\s]+(?:Ksh|KSh|KES)\s*([0-9,]+(?:\.\d{1,2})?)/i);
     if (costMatch) {
       cost = parseFloat(costMatch[1].replace(/,/g, ''));
+    }
+
+    // 4b. Phone number (e.g. recipient MSISDN) — stored for the CSV only,
+    // never included in AI snapshots
+    let phone = null;
+    const phoneMatch = body.match(/(\+?254|0)\d{9}(?!\d)/);
+    if (phoneMatch) {
+      phone = phoneMatch[0];
     }
 
     // 5. Date & Time from message: "on 20/9/26 at 11:50 AM"
@@ -230,7 +245,8 @@
       datetime: datetimeStr,
       timestamp: fallbackTimestamp || Date.now(),
       balance,
-      cost
+      cost,
+      phone
     };
   }
 
@@ -476,7 +492,7 @@
 
     const recents = db.slice(0, 15);
     if (!recents.length) {
-      listEl.innerHTML = '<li class="empty-state">No M-PESA transactions yet. Grant SMS access or paste one in the Transactions tab.</li>';
+      listEl.innerHTML = '<li class="empty-state">No M-PESA transactions yet. Grant SMS access to start tracking.</li>';
       return;
     }
 
@@ -895,65 +911,6 @@
   }
 
   // ========================================================
-  // PARSE MANUAL SMS TAB
-  // ========================================================
-  function initSmsTab() {
-    const parseBtn = document.getElementById('parseSmsBtn');
-    const inputEl = document.getElementById('smsInputText');
-    const sample1Btn = document.getElementById('sample1Btn');
-    const sample2Btn = document.getElementById('sample2Btn');
-    const sample3Btn = document.getElementById('sample3Btn');
-
-    if (sample1Btn && inputEl) {
-      sample1Btn.addEventListener('click', () => {
-        inputEl.value = 'UHK1A2B3C4 Confirmed. Ksh500.00 sent to JOHN DOE 0712345678 on 20/9/26 at 11:50 AM. New M-PESA balance is Ksh2,000.00. Transaction cost, Ksh7.00.';
-        inputEl.focus();
-      });
-    }
-
-    if (sample2Btn && inputEl) {
-      sample2Btn.addEventListener('click', () => {
-        inputEl.value = 'UHK1A2B3C4 Confirmed. Ksh850.00 paid to JAVA HOUSE. on 20/9/26 at 12:42 PM.';
-        inputEl.focus();
-      });
-    }
-
-    if (sample3Btn && inputEl) {
-      sample3Btn.addEventListener('click', () => {
-        inputEl.value = 'UHK1A2B3C4 Confirmed. You have received Ksh2,000.00 from JANE DOE 0722000000 on 20/9/26 at 9:01 AM.';
-        inputEl.focus();
-      });
-    }
-
-    if (parseBtn && inputEl) {
-      parseBtn.addEventListener('click', () => {
-        const text = inputEl.value.trim();
-        if (!text) {
-          showToast('Please paste an M-PESA SMS text first.');
-          return;
-        }
-
-        const parsed = parseMpesaMessage(text, Date.now());
-        if (!parsed) {
-          showToast('Could not find 10-character transaction code. Please check SMS.');
-          return;
-        }
-
-        const added = insertTransaction(parsed);
-        renderAllViews();
-        inputEl.value = '';
-
-        if (added) {
-          showToast(`Saved: ${parsed.type === 'received' ? '+' : '−'}KSh ${formatKsh(parsed.amount)} (${parsed.counterparty})`);
-        } else {
-          showToast(`Transaction ${parsed.code} was already in your database (no duplicate added).`);
-        }
-        // Stay on this screen — new entry appears in its month group above
-      });
-    }
-  }
-
-  // ========================================================
   // THEME & USER SETTINGS
   // ========================================================
   function initTheme() {
@@ -1062,10 +1019,44 @@
   // ========================================================
   // CSV EXPORT (native Storage Access Framework + browser fallback)
   // ========================================================
+  function csvEscapeCell(v) {
+    const s = String(v === null || v === undefined || v === '' ? '-' : v);
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+
+  // Date & time are ALWAYS filled: parse the SMS "dd/mm/yy hh:mm AM" string,
+  // falling back to the message timestamp so no cell is ever empty.
+  function csvDateTime(t) {
+    const m = String(t.datetime || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})(?:\s*([AP]M))?/i);
+    const pad = n => String(n).padStart(2, '0');
+    if (m) {
+      let dd = m[1], mm = m[2], yy = m[3], hh = parseInt(m[4], 10);
+      const min = m[5], ap = (m[6] || '').toUpperCase();
+      if (ap === 'PM' && hh < 12) hh += 12;
+      if (ap === 'AM' && hh === 12) hh = 0;
+      if (yy.length === 2) yy = '20' + yy;
+      return { date: `${yy}-${pad(mm)}-${pad(dd)}`, time: `${pad(hh)}:${min}` };
+    }
+    const d = new Date(Number(t.timestamp || Date.now()));
+    return {
+      date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+      time: `${pad(d.getHours())}:${pad(d.getMinutes())}`
+    };
+  }
+
   function buildCsvText() {
-    let csv = 'Code,Type,Category,Counterparty,Amount (KSh),Balance (KSh),Cost (KSh),Date\n';
+    let csv = 'Code,Date,Time,Type,Category,Counterparty,Phone,Amount (KSh),Cost (KSh),Balance (KSh)\n';
     db.forEach(t => {
-      csv += `"${t.code || ''}","${t.type || ''}","${t.category || ''}","${(t.counterparty || '').replace(/"/g, '""')}",${t.amount || 0},${t.balance !== null ? t.balance : ''},${t.cost !== null ? t.cost : ''},"${t.datetime || ''}"\n`;
+      const dt = csvDateTime(t);
+      const catName = (CATEGORIES[t.category] || {}).name || t.category || '-';
+      const amount = Number(t.amount || 0).toFixed(2);
+      const cost = (t.cost !== null && t.cost !== undefined) ? Number(t.cost).toFixed(2) : '-';
+      const balance = (t.balance !== null && t.balance !== undefined) ? Number(t.balance).toFixed(2) : '-';
+      csv += [
+        csvEscapeCell(t.code), csvEscapeCell(dt.date), csvEscapeCell(dt.time),
+        csvEscapeCell(t.type), csvEscapeCell(catName), csvEscapeCell(t.counterparty),
+        csvEscapeCell(t.phone), `"${amount}"`, `"${cost}"`, `"${balance}"`
+      ].join(',') + '\n';
     });
     return csv;
   }
@@ -1156,6 +1147,122 @@
   // ========================================================
   // GEMINI AI REPORT (optional — the app's only online feature)
   // ========================================================
+  // --------------------------------------------------------
+  // AI CORE — guarded, fallible, never blocking local features
+  // --------------------------------------------------------
+  function isOnline() {
+    return typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+  }
+
+  function getGeminiKey() {
+    return (localStorage.getItem(STORAGE_KEY_GEMINI) || '').trim();
+  }
+
+  // Feature flag: AI only runs when the user opted in with their own key
+  function isGeminiEnabled() {
+    return getGeminiKey().length > 0;
+  }
+
+  // Non-blocking badge next to the AI controls when connectivity drops
+  function updateAiOfflineBadge() {
+    const badge = document.getElementById('aiOfflineBadge');
+    if (badge) badge.classList.toggle('is-visible', !isOnline());
+  }
+
+  // Capture the precise HTTP failure body (never a fabricated cause)
+  async function readGeminiErrorBody(resp) {
+    let raw = '';
+    try { raw = await resp.text(); } catch (_) { /* noop */ }
+    let message = '';
+    try {
+      const parsed = JSON.parse(raw);
+      message = (parsed && parsed.error && parsed.error.message) ? parsed.error.message : '';
+    } catch (_) { /* not JSON */ }
+    if (!message) message = (raw || '').slice(0, 160);
+    return { status: resp.status, message, raw };
+  }
+
+  // One gateway for every Gemini call: dynamic model fallback on 404,
+  // precise error capture, hard timeout — and it never throws.
+  async function callGemini(prompt, opts) {
+    // Offline-first guardrails: feature flag + connectivity check up front
+    if (!isGeminiEnabled()) return { ok: false, reason: 'no-key' };
+    if (!isOnline()) return { ok: false, reason: 'offline' };
+
+    const key = getGeminiKey();
+    const cfg = Object.assign({ temperature: 0.2, maxOutputTokens: 4096 }, opts || {});
+    let lastHttpError = null;
+
+    for (const model of GEMINI_MODELS) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), cfg.timeout || GEMINI_TIMEOUT_MS);
+      try {
+        const resp = await fetch(
+          `${GEMINI_ENDPOINT}/${model}:generateContent?key=${encodeURIComponent(key)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: cfg.temperature, maxOutputTokens: cfg.maxOutputTokens }
+            })
+          }
+        );
+        clearTimeout(timer);
+
+        if (!resp.ok) {
+          const err = await readGeminiErrorBody(resp);
+          console.warn(`[Gemini] ${model} -> HTTP ${err.status}: ${err.message}`);
+          if (err.status === 404) { lastHttpError = err; continue; } // retired model: clean fallback
+          if (err.status === 400 || err.status === 403) return { ok: false, reason: 'bad-key', status: err.status };
+          if (err.status === 429) return { ok: false, reason: 'quota', status: err.status };
+          return { ok: false, reason: 'http', status: err.status, detail: err.message };
+        }
+
+        const data = await resp.json();
+        const parts = ((((data || {}).candidates || [])[0] || {}).content || {}).parts || [];
+        const text = (parts[0] && parts[0].text) ? String(parts[0].text).trim() : '';
+        if (!text) return { ok: false, reason: 'empty' };
+        return { ok: true, text, model };
+      } catch (e) {
+        clearTimeout(timer);
+        if (e && e.name === 'AbortError') return { ok: false, reason: 'timeout' };
+        return { ok: false, reason: 'network' };
+      }
+    }
+
+    return { ok: false, reason: 'model-404', status: 404, detail: lastHttpError ? lastHttpError.message : '' };
+  }
+
+  // Honest, specific failure toasts — never the misleading
+  // "check your internet connection" for an upstream 404.
+  function toastGeminiFailure(res) {
+    if (!res) return;
+    switch (res.reason) {
+      case 'no-key':  showToast('Add your Gemini API key first — AI features are optional.'); break;
+      case 'bad-key': showToast('Gemini rejected the API key — get a fresh one at aistudio.google.com'); break;
+      case 'quota':   showToast('Gemini quota exhausted — try again later.'); break;
+      default:        showToast('Gemini AI feature failed. Local features remain unaffected.');
+    }
+  }
+
+  // Compact, privacy-preserving snapshot shared by all AI features:
+  // date/type/category/counterparty/amount/fee — NEVER codes, phones or balances.
+  function aiSnapshot(rows, limit) {
+    return rows.slice(0, limit || 120).map(t => ({
+      d: t.datetime || '',
+      t: t.type || 'sent',
+      c: t.category || 'shopping',
+      p: (t.counterparty || '').slice(0, 40),
+      a: Number(t.amount || 0),
+      f: Number(t.cost || 0)
+    }));
+  }
+
+  // --------------------------------------------------------
+  // AI STATEMENT CSV (Gemini)
+  // --------------------------------------------------------
   function initAiExport() {
     const keyInput = document.getElementById('geminiKeyInput');
     const aiBtn = document.getElementById('exportAiBtn');
@@ -1173,9 +1280,8 @@
     if (!aiBtn) return;
 
     aiBtn.addEventListener('click', async () => {
-      const key = (localStorage.getItem(STORAGE_KEY_GEMINI) || '').trim();
-      if (!key) {
-        showToast('Add your Gemini API key above first — AI reports are optional.');
+      if (!isGeminiEnabled()) {
+        toastGeminiFailure({ reason: 'no-key' });
         if (keyInput) keyInput.focus();
         return;
       }
@@ -1183,18 +1289,15 @@
         showToast('No transactions to analyze yet. Sync your SMS inbox first.');
         return;
       }
-
-      // Compact, anonymized-agnostic payload (codes + parties are yours; stays
-      // between your device and Google's API using your own key).
-      const rows = db.slice(0, 150).map(t => ({
-        type: t.type, category: t.category,
-        counterparty: t.counterparty, amount: t.amount,
-        cost: t.cost, date: t.datetime
-      }));
+      if (!isOnline()) {
+        toastGeminiFailure({ reason: 'offline' });
+        return;
+      }
 
       const prompt =
-        'You are a personal-finance CSV generator. Here is my M-PESA transaction ledger as JSON:\n' +
-        JSON.stringify(rows) +
+        'You are a personal-finance CSV generator. Here is my M-PESA transaction ledger as JSON. ' +
+        'Each entry: d=date&time, t=type, c=category, p=counterparty, a=amount KES, f=fee KES.\n' +
+        JSON.stringify(aiSnapshot(db, 150)) +
         '\n\nProduce a UTF-8 CSV report with EXACTLY these sections in order:\n' +
         '1) Header row: Section,Month,Category,Transactions Count,Total (KSh),Share of Spend %,Insight\n' +
         '2) One row per category per calendar month summarized from the data (Section=Monthly)\n' +
@@ -1208,58 +1311,215 @@
       if (aiLabel) aiLabel.textContent = 'Generating…';
       if (aiIcon) aiIcon.classList.add('ic-spin');
 
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 30000);
-        const resp = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(key)}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: controller.signal,
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
-            })
-          }
-        );
-        clearTimeout(timer);
+      const res = await callGemini(prompt, { temperature: 0.2, maxOutputTokens: 4096 });
 
-        if (!resp.ok) {
-          if (resp.status === 400 || resp.status === 403) {
-            showToast('Gemini rejected the API key. Check it in AI Studio.');
-          } else if (resp.status === 429) {
-            showToast('Gemini quota exhausted — try again later.');
-          } else {
-            showToast(`Gemini error ${resp.status}. Check your internet connection.`);
-          }
-          return;
-        }
+      aiBtn.disabled = false;
+      if (aiLabel) aiLabel.textContent = 'Generate AI Report CSV';
+      if (aiIcon) aiIcon.classList.remove('ic-spin');
 
-        const data = await resp.json();
-        let text = (((data.candidates || [])[0] || {}).content || {}).parts;
-        text = (text && text[0] && text[0].text) ? text[0].text.trim() : '';
-        // Strip stray markdown fences the model may add
-        text = text.replace(/^```[a-z]*\s*/i, '').replace(/```\s*$/, '').trim();
+      if (!res.ok) {
+        toastGeminiFailure(res);
+        return;
+      }
 
-        if (!text || !/^["A-Za-z]/.test(text)) {
-          showToast('Gemini returned an unusable response. Try again.');
-          return;
-        }
+      // Strip stray markdown fences the model may add
+      let text = res.text.replace(/^```[a-z]*\s*/i, '').replace(/```\s*$/, '').trim();
+      if (!text || !/^["A-Za-z]/.test(text)) {
+        showToast('Gemini returned an unusable response. Try again.');
+        return;
+      }
+      await saveCsvEverywhere(`mpesa-ai-report-${todaySlug()}.csv`, text);
+    });
+  }
 
-        await saveCsvEverywhere(`mpesa-ai-report-${todaySlug()}.csv`, text);
-      } catch (e) {
-        if (e && e.name === 'AbortError') {
-          showToast('Gemini request timed out. Check your internet connection.');
-        } else {
-          showToast('AI report needs an internet connection. Everything else works offline.');
-        }
-      } finally {
-        aiBtn.disabled = false;
-        if (aiLabel) aiLabel.textContent = 'Generate AI Report CSV';
-        if (aiIcon) aiIcon.classList.remove('ic-spin');
+  // --------------------------------------------------------
+  // FEES & FULIZA LEAKAGE AUDIT (30 days)
+  // --------------------------------------------------------
+  function leakageWindowRows() {
+    const cutoff = Date.now() - 30 * 86400000;
+    const rows = db.filter(t => Number(t.timestamp || 0) >= cutoff);
+    return rows.length ? rows : db.slice(0, 200); // newest-first db; fall back to latest slice
+  }
+
+  // Offline fallback: plain local arithmetic on the parsed "Transaction cost"
+  // fields and Fuliza-tagged entries. Always available — key or no key.
+  function computeLocalLeakage(rows) {
+    let transferFees = 0, airtimeFees = 0, fulizaFees = 0;
+    rows.forEach(t => {
+      if (t.type === 'received') return;
+      const cost = Number(t.cost || 0);
+      const isFuliza = /fuliza/i.test(t.counterparty || '') || t.type === 'fee';
+      if (isFuliza) {
+        fulizaFees += Number(t.amount || 0) + cost;
+        return;
+      }
+      if (t.category === 'airtime') airtimeFees += cost;
+      else transferFees += cost;
+    });
+    return { transferFees, airtimeFees, fulizaFees, total: transferFees + airtimeFees + fulizaFees };
+  }
+
+  function renderLeakageLocal(resultEl, rows, noteHtml) {
+    const L = computeLocalLeakage(rows);
+    resultEl.classList.add('is-open');
+    resultEl.innerHTML =
+      '<span class="ai-panel-badge ai-panel-badge--local">Local estimate · works offline</span>' +
+      '<ul class="ai-panel-list">' +
+      `<li><span>Transfer &amp; Paybill costs</span><strong>KSh ${formatKsh(L.transferFees)}</strong></li>` +
+      `<li><span>Airtime purchase fees</span><strong>KSh ${formatKsh(L.airtimeFees)}</strong></li>` +
+      `<li><span>Fuliza fees &amp; interest</span><strong>KSh ${formatKsh(L.fulizaFees)}</strong></li>` +
+      '</ul>' +
+      `<p class="ai-panel-total">Total 30-day leakage: <strong>KSh ${formatKsh(L.total)}</strong></p>` +
+      (noteHtml || '');
+  }
+
+  function initLeakageAudit() {
+    const btn = document.getElementById('leakageBtn');
+    const label = document.getElementById('leakageLabel');
+    const iconEl = document.getElementById('leakageIcon');
+    const resultEl = document.getElementById('leakageResult');
+    if (!btn || !resultEl) return;
+
+    btn.addEventListener('click', async () => {
+      if (!db.length) {
+        showToast('No transactions yet — sync your SMS inbox first.');
+        return;
+      }
+      const rows = leakageWindowRows();
+
+      // Guardrails first: offline or no key -> instant local arithmetic,
+      // the audit never hard-fails
+      if (!isOnline() || !isGeminiEnabled()) {
+        renderLeakageLocal(resultEl, rows,
+          `<p class="ai-panel-note">${!isOnline() ? 'You are offline. ' : 'No Gemini key set. '}` +
+          'Go online with a key for the full AI breakdown &amp; savings tips.</p>');
+        return;
+      }
+
+      btn.disabled = true;
+      if (label) label.textContent = 'Auditing with Gemini…';
+      if (iconEl) iconEl.classList.add('ic-spin');
+
+      const prompt =
+        'You are an M-PESA cost auditor. Below are my M-PESA transactions from roughly the last 30 days as JSON.\n' +
+        'Each entry: d=date&time, t=type (sent/received/airtime/withdraw/fee), c=category, p=counterparty, a=amount KES, f=explicit transaction cost KES.\n' +
+        JSON.stringify(aiSnapshot(rows, 150)) + '\n' +
+        'TASKS:\n' +
+        '1) Compute the TOTAL "leakage" — money spent purely on M-PESA charges: every f (send/Paybill/agent/ATM costs), Fuliza access fees & interest (p contains FULIZA or t=fee), and airtime purchase costs.\n' +
+        '2) Give 2-4 short breakdown lines with KES amounts (Transaction costs · Fuliza fees/interest · Agent/ATM charges as applicable).\n' +
+        '3) End with ONE concrete saving tip including an estimated KES saving for next month.\n' +
+        'Format EXACTLY:\nTotal 30-day leakage: KES X\n• line\n• line\nTip: ...\n' +
+        'Plain text only, under 90 words.';
+
+      const res = await callGemini(prompt, { temperature: 0.15, maxOutputTokens: 700 });
+
+      btn.disabled = false;
+      if (label) label.textContent = 'Audit My M-PESA Fees';
+      if (iconEl) iconEl.classList.remove('ic-spin');
+
+      if (res.ok) {
+        resultEl.classList.add('is-open');
+        resultEl.innerHTML =
+          `<span class="ai-panel-badge ai-panel-badge--gemini">Gemini · ${escapeHtml(res.model)}</span>` +
+          `<p class="ai-panel-text">${escapeHtml(res.text).replace(/\n/g, '<br>')}</p>`;
+      } else {
+        // Graceful degradation: local arithmetic, plus an honest toast
+        renderLeakageLocal(resultEl, rows,
+          '<p class="ai-panel-note">Gemini unreachable — computed locally from your parsed fee fields.</p>');
+        toastGeminiFailure(res);
       }
     });
+  }
+
+  // --------------------------------------------------------
+  // CHAT WITH YOUR WALLET (natural-language M-PESA querying)
+  // --------------------------------------------------------
+  function appendChatBubble(logEl, kind, text) {
+    const div = document.createElement('div');
+    div.className = 'chat-bubble chat-bubble--' + kind;
+    div.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+    logEl.appendChild(div);
+    while (logEl.children.length > 12) logEl.removeChild(logEl.firstChild);
+    logEl.scrollTop = logEl.scrollHeight;
+    return div;
+  }
+
+  function initWalletChat() {
+    const logEl = document.getElementById('chatLog');
+    const input = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('chatSendBtn');
+    const sendIcon = document.getElementById('chatSendIcon');
+    if (!logEl || !input || !sendBtn) return;
+
+    document.querySelectorAll('.ai-chip[data-suggest]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        input.value = chip.getAttribute('data-suggest') || '';
+        input.focus();
+      });
+    });
+
+    async function ask() {
+      const question = input.value.trim();
+      if (!question) return;
+      if (!db.length) {
+        showToast('No transactions yet — sync your SMS inbox first.');
+        return;
+      }
+      if (!isGeminiEnabled()) {
+        toastGeminiFailure({ reason: 'no-key' });
+        return;
+      }
+      if (!isOnline()) {
+        toastGeminiFailure({ reason: 'offline' });
+        return;
+      }
+
+      input.value = '';
+      appendChatBubble(logEl, 'user', question);
+      const thinking = appendChatBubble(logEl, 'ai', 'Thinking…');
+      thinking.classList.add('chat-bubble--thinking');
+
+      sendBtn.disabled = true;
+      if (sendIcon) sendIcon.classList.add('ic-spin');
+
+      const prompt =
+        'You are the user’s private M-PESA wallet assistant (Kenya, currency KES). ' +
+        'Answer the question using ONLY the JSON transaction history below. ' +
+        'Each entry: d=date&time, t=type, c=category, p=counterparty, a=amount KES, f=fee KES.\n' +
+        'Rules: compute totals exactly; format amounts like "KES 1,250"; dates in d are DD/MM/YY HH:MM AM/PM; ' +
+        'if several people share a first name, say which names matched; if the data is insufficient, state plainly what is missing. ' +
+        'Max 100 words. Plain text only.\n' +
+        'HISTORY: ' + JSON.stringify(aiSnapshot(db, 140)) + '\nQUESTION: ' + question;
+
+      const res = await callGemini(prompt, { temperature: 0.25, maxOutputTokens: 800 });
+
+      sendBtn.disabled = false;
+      if (sendIcon) sendIcon.classList.remove('ic-spin');
+      thinking.classList.remove('chat-bubble--thinking');
+
+      if (res.ok) {
+        thinking.innerHTML = escapeHtml(res.text).replace(/\n/g, '<br>');
+      } else {
+        thinking.textContent = 'Gemini AI feature failed. Local features remain unaffected.';
+        thinking.classList.add('chat-bubble--error');
+        toastGeminiFailure(res);
+      }
+    }
+
+    sendBtn.addEventListener('click', ask);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') ask(); });
+  }
+
+  // --------------------------------------------------------
+  // AI umbrella: badge wiring + all optional features
+  // --------------------------------------------------------
+  function initAiFeatures() {
+    updateAiOfflineBadge();
+    window.addEventListener('online', updateAiOfflineBadge);
+    window.addEventListener('offline', updateAiOfflineBadge);
+    initAiFeatures();
+    initLeakageAudit();
+    initWalletChat();
   }
 
   // ========================================================
@@ -1479,9 +1739,8 @@
     initProfilePhoto();
     renderAllViews();
     initTabs();
-    initSmsTab();
     initSettingsActions();
-    initAiExport();
+    initAiFeatures();
     initInboxSync();
     initPermissionScreen();
   });
