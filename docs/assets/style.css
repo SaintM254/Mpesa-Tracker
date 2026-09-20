@@ -1386,3 +1386,225 @@ input:checked + .slider:before {
   border-radius: 9px;
   display: block;
 }
+
+/* ===========================================================
+   v3.0.0 — GLASSMORPHISM · FLOATING PILL DOCK · APPLE-STYLE POLISH
+   ─ Frosted translucent cards on ambient gradient gels (light & dark)
+   ─ Floating, thumb-friendly pill dock (no longer full-width)
+   ─ Subtle layered shadows on every button & card, generous radii
+   =========================================================== */
+
+/* ---- Glass tokens: light theme ---- */
+:root {
+  --app-bg:          #eef0f6;
+  --app-surface:     rgba(255, 255, 255, .66);
+  --app-surface-2:   rgba(255, 255, 255, .50);
+  --app-text:        #14182b;
+  --app-muted:       #5c6478;
+  --app-border:      rgba(255, 255, 255, .78);
+  --app-border-subtle: rgba(120, 132, 158, .35);
+
+  /* Ambient pastel gels (per the reference UI shots) */
+  --glow-1: rgba(124, 92, 255, .17);   /* violet */
+  --glow-2: rgba(34, 197, 94, .14);    /* mint   */
+  --glow-3: rgba(255, 159, 67, .13);   /* peach  */
+
+  --topbar-bg: rgba(240, 242, 248, .78);
+  --modal-bg:  rgba(255, 255, 255, .86);
+
+  /* Layered, soft shadow system */
+  --shadow-sm: 0 1px 2px rgba(31, 26, 66, .05), 0 4px 14px rgba(31, 26, 66, .07);
+  --shadow-md: 0 2px 6px rgba(31, 26, 66, .07), 0 16px 36px -8px rgba(31, 26, 66, .14);
+  --shadow-lg: 0 6px 16px rgba(31, 26, 66, .10), 0 24px 48px -12px rgba(31, 26, 66, .18);
+  --shadow-brand: 0 8px 22px rgba(15, 123, 58, .28);
+}
+
+/* ---- Glass tokens: dark theme ---- */
+[data-theme="dark"] {
+  --app-bg:          #06080a;
+  --app-surface:     rgba(24, 29, 38, .58);
+  --app-surface-2:   rgba(35, 42, 53, .50);
+  --app-text:        #eef2f8;
+  --app-muted:       #93a0b4;
+  --app-border:      rgba(255, 255, 255, .09);
+  --app-border-subtle: rgba(255, 255, 255, .15);
+
+  /* Deep green/lime gels (per the dark reference shot) */
+  --glow-1: rgba(34, 197, 94, .16);
+  --glow-2: rgba(196, 255, 77, .08);
+  --glow-3: rgba(56, 189, 248, .10);
+
+  --topbar-bg: rgba(6, 8, 10, .70);
+  --modal-bg:  rgba(17, 21, 28, .88);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .40), 0 4px 14px rgba(0, 0, 0, .35);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, .45), 0 16px 36px -8px rgba(0, 0, 0, .50);
+  --shadow-lg: 0 6px 16px rgba(0, 0, 0, .50), 0 24px 48px -12px rgba(0, 0, 0, .55);
+  --shadow-brand: 0 8px 24px rgba(18, 160, 86, .38);
+}
+
+/* ---- Ambient gradient gels behind everything ---- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(560px 380px at 12% -6%, var(--glow-1), transparent 70%),
+    radial-gradient(520px 430px at 106% 24%, var(--glow-2), transparent 70%),
+    radial-gradient(720px 540px at 50% 114%, var(--glow-3), transparent 70%);
+}
+
+html, body {
+  transition: background-color .25s ease, color .25s ease;
+}
+
+/* ---- Frosted glass on every card / surface ---- */
+.tx-list, .mini-stat, .summary-card, .category-breakdown-card, .input-card,
+.sms-help-card, .category-card, .settings-item, .privacy-banner, .perm-banner,
+.tx-group, .empty-state--card, .modal-card, .icon-btn-round, .sample-chip,
+.cat-option-btn, .app-toast, .settings-input, .sms-textarea {
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  backdrop-filter: blur(24px) saturate(1.5);
+}
+
+/* Subtle shadows around cards & tappables */
+.tx-list, .mini-stat, .summary-card, .category-breakdown-card, .input-card,
+.sms-help-card, .category-card, .settings-item, .privacy-banner,
+.tx-group, .empty-state--card, .icon-btn-round,
+.sample-chip, .cat-option-btn, .settings-input, .sms-textarea {
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---- Glass top bar ---- */
+.app-topbar {
+  background: var(--topbar-bg);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+}
+
+/* ---- Floating pill dock: narrower, fully rounded, thumb-reachable ---- */
+.dock {
+  position: fixed;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(330px, calc(100% - 36px));
+  max-width: 330px;
+  padding: 8px;
+  gap: 4px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-lg);
+  -webkit-backdrop-filter: blur(28px) saturate(1.7);
+  backdrop-filter: blur(28px) saturate(1.7);
+}
+
+.dock-item {
+  border-radius: 50%;
+  transition: background-color .18s ease, color .18s ease, transform .12s ease;
+}
+.dock-item:active { transform: scale(.9); }
+
+.dock-item.is-active {
+  background: linear-gradient(135deg, var(--brand-light), var(--brand));
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(15, 123, 58, .40), inset 0 1px 0 rgba(255, 255, 255, .35);
+}
+
+/* Leave clearance for the floating pill */
+.app-main-content { padding-bottom: 128px; }
+
+/* Toast floats above the pill dock */
+.app-toast {
+  bottom: 104px;
+  background: rgba(17, 22, 32, .82);
+  border: 1px solid rgba(255, 255, 255, .12);
+}
+
+/* ---- Apple-style buttons: subtle shadows, gradients, press physics ---- */
+.btn {
+  box-shadow: var(--shadow-sm);
+  letter-spacing: .01em;
+  transition: background-color .15s ease, box-shadow .15s ease, transform .1s ease;
+}
+.btn:active { transform: scale(.96); }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-light), var(--brand));
+  box-shadow: var(--shadow-brand), inset 0 1px 0 rgba(255, 255, 255, .30);
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--brand-light), var(--brand-strong));
+}
+
+.btn-ghost {
+  background: var(--app-surface-2);
+  border-color: var(--app-border);
+}
+.btn-ghost:hover { background: var(--app-surface); }
+
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 8px 20px rgba(220, 38, 38, .30), inset 0 1px 0 rgba(255, 255, 255, .25);
+}
+
+/* Selected category chip: brand ring + soft lift */
+.cat-option-btn.is-selected {
+  background: rgba(15, 123, 58, .12);
+  box-shadow: 0 0 0 1px var(--brand), var(--shadow-sm);
+}
+
+/* ---- Inputs with focus halo ---- */
+.sms-textarea { border-radius: 16px; background: var(--app-surface-2); }
+.sms-textarea:focus, .settings-input:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px rgba(15, 123, 58, .14), var(--shadow-sm);
+  outline: none;
+}
+.sample-chip { border-radius: 999px; }
+
+/* ---- Generous Apple-style radii ---- */
+.summary-card, .category-breakdown-card, .input-card, .sms-help-card,
+.settings-item, .tx-group, .privacy-banner, .empty-state--card {
+  border-radius: 24px;
+}
+.mini-stat, .category-card { border-radius: 20px; }
+.perm-banner { border-radius: 20px; }
+
+/* ---- Hero balance card: inner highlight + brand glow ---- */
+.balance-card {
+  border-radius: 28px;
+  box-shadow:
+    var(--shadow-brand),
+    inset 0 1.5px 0 rgba(255, 255, 255, .28),
+    inset 0 -12px 26px rgba(0, 0, 0, .12);
+}
+
+/* Subtle depth on the circular icon bubbles */
+.tx-icon, .perm-banner-icon, .modal-icon-badge, .cat-bar-badge {
+  box-shadow: inset 0 -8px 14px rgba(0, 0, 0, .16), 0 3px 8px rgba(0, 0, 0, .12);
+}
+
+/* ---- Glass modals (bottom sheets) ---- */
+.modal-card {
+  background: var(--modal-bg);
+  border: 1px solid var(--app-border);
+  border-bottom: none;
+  border-radius: 30px 30px 0 0;
+  box-shadow: var(--shadow-lg), 0 -12px 42px rgba(0, 0, 0, .22);
+}
+
+/* ---- iOS switch: knob shadow for tactile depth ---- */
+.slider:before { box-shadow: 0 2px 5px rgba(0, 0, 0, .22); }
+
+/* ---- Reveal animation for first paint ---- */
+.app-tab-view.is-active > * {
+  animation: v3-rise .35s cubic-bezier(.2, .8, .2, 1) both;
+}
+@keyframes v3-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}

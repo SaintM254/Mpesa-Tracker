@@ -2,9 +2,9 @@
   'use strict';
 
   // ========================================================
-  // M-PESA TRACKER v2.1.1 — OFFLINE-FIRST M-PESA SMS ENGINE
+  // M-PESA TRACKER v3.0.0 — OFFLINE-FIRST M-PESA SMS ENGINE
   // Zero-mock ledger · SAF CSV export · optional Gemini AI · photo cropping
-  // Weekly chart labels · All-Transactions month/year accordion
+  // Glassmorphism UI · Floating pill dock · Apple-style polish
   // ========================================================
 
   const STORAGE_KEY_TX = 'mpesa_tracker_tx_db_v4'; // fresh namespace: no legacy mock data

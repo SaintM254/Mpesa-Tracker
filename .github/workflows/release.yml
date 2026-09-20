@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag (e.g. v2.1.1)"
+        description: "Release tag (e.g. v3.0.0)"
         required: true
-        default: "v2.1.1"
+        default: "v3.0.0"
       release_name:
         description: "Release display name"
         required: true
-        default: "M-PESA Tracker v2.1.1"
+        default: "M-PESA Tracker v3.0.0"
   push:
     branches: [main, 'arena/**']
 
@@ -219,18 +219,17 @@ jobs:
           # the tag silently lands on the default branch's HEAD instead.
           target_commitish: ${{ github.sha }}
           body: |
-            ## M-PESA Tracker v2.1.1 — Android APK
+            ## M-PESA Tracker v3.0.0 — Android APK
 
-            ### 🚀 What's new in v2.1.1
-            - **App icon fixed & everywhere**: the coin artwork is re-scaled so nothing clips inside adaptive icon masks (verified against the 66% safe zone). Launcher, splash, favicon, the About row in Settings and the repo README all show the new icon — the old “M” is gone for good.
-            - **Update-friendly signing from now on**: the release key is now pinned (committed PKCS#12 keystore), so every future APK is signed identically and installs straight on top of the previous one. ⚠️ One-time: v2.1.0 and older were signed with throwaway per-run keys that no longer exist, so they must be uninstalled once — Android blocks their update path by design. After this release, updates are seamless forever.
-            - **Weekly chart with day labels**: weekday names under every bar; tap a bar to read that day's total spend. Defaults to today and survives re-renders.
-            - **New “Transactions” tab** (replaces the ➕ Parse tab with a receipt icon): *View all* on the dashboard routes here and auto-highlights the tab. Transactions are grouped into **collapsible Year/Month accordions** (“September 2026”) with monthly spend totals; the latest month is expanded by default. Tapping any row opens the same Change-Category popup used on Home — edits re-render everywhere instantly, and scroll position & expanded state are preserved while switching tabs. The manual paste-SMS tool lives at the bottom of this tab.
+            ### 🚀 What's new in v3.0.0
+            - **Floating pill dock**: the bottom bar no longer spans the full width of the phone. It's a compact, heavily rounded floating pill centered in the thumb zone for true one-hand operation, with a frosted-glass finish and a glowing gradient on the active tab.
+            - **Glassmorphism everywhere**: every card, sheet, banner and input is now translucent frosted glass (`backdrop-filter` blur + saturation) layered over ambient pastel gradient gels — violet/mint/peach in **light mode**, deep green/lime in **dark mode**. Both themes glass correctly.
+            - **Apple-style polish**: generous 24–30px corner radii, subtle layered shadows on **all buttons** (primary actions get a green gradient with a brand-glow shadow, danger gets its own tinted shadow), focus halos on inputs, tactile press-down physics (`scale(.96)`), a glass top app bar, frosted bottom-sheet modals, an iOS-style switch knob, and a soft rise-in animation when a tab first paints.
 
             ### Installation:
-            1. ⚠️ Uninstall v2.1.0 or older **once** (their signing keys were per-run and differ from this build — Android requirement).
-            2. Download `app-release.apk` below and install.
-            3. All future versions update in place — no more “conflicting signatures”.
+            1. ⚠️ Uninstall versions **older than v2.1.1** once (they were signed with per-run keys).
+            2. Download `app-release.apk` below and install — updates from v2.1.1 onward install in place.
+            3. All future versions keep the pinned signature — no more conflicts.
 
             SHA-256 checksums are in `SHA256SUMS.txt`.
           draft: false
