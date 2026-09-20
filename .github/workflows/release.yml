@@ -207,6 +207,9 @@ jobs:
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.name }}
+          # Always tag the exact commit that produced this APK — without this,
+          # the tag silently lands on the default branch's HEAD instead.
+          target_commitish: ${{ github.sha }}
           body: |
             ## M-PESA Tracker v2.0.0 — Android APK
 
