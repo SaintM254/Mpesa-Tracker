@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag (e.g. v3.1.1)"
+        description: "Release tag (e.g. v4.4)"
         required: true
-        default: "v3.1.1"
+        default: "v4.4"
       release_name:
         description: "Release display name"
         required: true
-        default: "M-PESA Tracker v3.1.1"
+        default: "M-PESA Tracker v4.4"
   push:
     branches: [main, 'arena/**']
 
@@ -219,18 +219,22 @@ jobs:
           # the tag silently lands on the default branch's HEAD instead.
           target_commitish: ${{ github.sha }}
           body: |
-            ## M-PESA Tracker v3.1.1 — Android APK
+            ## M-PESA Tracker v4.4 — Android APK
 
-            ### 🛠 Hotfix: AI buttons were silently dead
-            - **Root cause found & fixed**: a self-recursive call inside the AI initializer (`initAiFeatures` accidentally invoked itself instead of `initAiExport`). On startup it raised `Maximum call stack size exceeded`, which aborted that boot step — so the clicks of **all three AI buttons** (leakage audit, wallet chat, AI report) and the API-key listener never got attached. No toast, no response, exactly as reported. This also starved the SMS-sync initializer.
-            - **Verified before shipping**: reproduced the exact silent-buttons behavior in a scripted DOM harness, then re-ran it post-fix — key persistence, all three buttons, offline badge, local leakage arithmetic (KSh totals verified), and the graceful failure bubbles/toasts all fire correctly with zero console errors.
-            - **Hardened boot**: every initializer now runs in its own guard, so a single future fault can never again starve the rest of the app silently.
+            ### 🤖 The AI fix — for real this time
+            - **True root cause**: every model in the previous fallback chain (`gemini-2.0-flash`, `gemini-1.5-flash`, `gemini-1.5-flash-8b`) has been **retired by Google** — 1.5 family in Sept 2025, the 2.0 family on 1 June 2026 — so Google always answered 404 and the graceful fallback message fired. The chain is now anchored to models alive **today**: `gemini-3.8-flash` → `gemini-3.5-flash` → `gemini-3.1-flash-lite` → `gemini-2.5-flash-lite` → `gemini-2.5-flash`, with the same clean 404 rollover.
+            - Failure toasts now include the real upstream status (e.g. `HTTP 403`) so any future outage is instantly diagnosable.
+            - Added `ACCESS_NETWORK_STATE` so the offline badge reflects true connectivity.
 
-            Everything else from v3.1.0 is unchanged (Gemini model fallback chain, fee audit + local fallback, wallet chat privacy snapshot, clean CSV).
+            ### ✨ Look & feel
+            - **New chat loading animation**: Apple-style typing dots pulsing inside the AI bubble — the weird spinning send icon is gone (button simply rests while waiting).
+            - **Header profile photo is now display-only** — tapping it on the main pages does nothing; changing the photo remains a Settings-only action.
+            - **Fluid transitions**: every tab switch glides in with a soft rise-and-scale settle; scroll behavior is smooth; tab-presses pop with a spring.
+            - **Living glass**: the ambient pastel/aurora gels behind the frosted cards drift almost imperceptibly; taps give subtle scale feedback. All motion is GPU-composited transform/opacity only — zero JS animation libraries, still feather-light, and fully disabled when the user prefers reduced motion.
 
             ### Installation:
             1. Install `app-release.apk` on top — pinned signature, no conflicts.
-            2. **Settings → Export &amp; Reports**: paste your key → toast confirms it saves; tap *Audit My M-PESA Fees* and *Chat with your Wallet* — they now respond.
+            2. Settings → Export &amp; Reports → paste your free key (aistudio.google.com) → Audit My M-PESA Fees / Chat with your Wallet now connect.
 
             SHA-256 checksums are in `SHA256SUMS.txt`.
           draft: false

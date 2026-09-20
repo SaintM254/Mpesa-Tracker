@@ -2,11 +2,13 @@
   'use strict';
 
   // ========================================================
-  // M-PESA TRACKER v3.1.1 — OFFLINE-FIRST M-PESA SMS ENGINE
+  // M-PESA TRACKER v4.4 — OFFLINE-FIRST M-PESA SMS ENGINE
   // Zero-mock ledger · SAF CSV export · optional Gemini AI · photo cropping
   // Glassmorphism UI · Floating pill dock · Apple-style polish
   // Gemini model fallback · Fees & Fuliza leakage audit · Wallet chat
   // v3.1.1: boot hardening — isolated init steps
+  // v4.4: live model chain (1.5/2.0 retired 2025-26) · typing-dots
+  // loading · avatar tap inert · fluid glass motion
   // ========================================================
 
   const STORAGE_KEY_TX = 'mpesa_tracker_tx_db_v4'; // fresh namespace: no legacy mock data
@@ -22,7 +24,17 @@
   // Gemini: standard v1beta endpoint + ordered fallback chain. If the primary
   // model is retired/renamed (HTTP 404) we roll cleanly to the next one.
   const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
-  const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'];
+  // Sept 2026 reality: gemini-1.5-* retired Sept 2025 and the gemini-2.0-*
+  // family shut down 1 June 2026 — the old chain 404'd everywhere, which is
+  // the "Gemini AI feature failed" users saw. This chain holds only models
+  // alive today; any 404 still rolls cleanly to the next.
+  const GEMINI_MODELS = [
+    'gemini-3.8-flash',
+    'gemini-3.5-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-flash'
+  ];
   const GEMINI_TIMEOUT_MS = 30000;
 
   // ========================================================
@@ -1244,7 +1256,10 @@
       case 'no-key':  showToast('Add your Gemini API key first — AI features are optional.'); break;
       case 'bad-key': showToast('Gemini rejected the API key — get a fresh one at aistudio.google.com'); break;
       case 'quota':   showToast('Gemini quota exhausted — try again later.'); break;
-      default:        showToast('Gemini AI feature failed. Local features remain unaffected.');
+      default: {
+        const suffix = res.status ? ` (Google returned HTTP ${res.status})` : '';
+        showToast(`Gemini AI feature failed${suffix}. Local features remain unaffected.`);
+      }
     }
   }
 
@@ -1268,7 +1283,6 @@
     const keyInput = document.getElementById('geminiKeyInput');
     const aiBtn = document.getElementById('exportAiBtn');
     const aiLabel = document.getElementById('exportAiLabel');
-    const aiIcon = document.getElementById('exportAiIcon');
 
     if (keyInput) {
       keyInput.value = localStorage.getItem(STORAGE_KEY_GEMINI) || '';
@@ -1309,14 +1323,14 @@
         'Respond with ONLY the CSV content — no commentary, no markdown fences.';
 
       aiBtn.disabled = true;
+      aiBtn.classList.add('btn-loading');
       if (aiLabel) aiLabel.textContent = 'Generating…';
-      if (aiIcon) aiIcon.classList.add('ic-spin');
 
       const res = await callGemini(prompt, { temperature: 0.2, maxOutputTokens: 4096 });
 
       aiBtn.disabled = false;
+      aiBtn.classList.remove('btn-loading');
       if (aiLabel) aiLabel.textContent = 'Generate AI Report CSV';
-      if (aiIcon) aiIcon.classList.remove('ic-spin');
 
       if (!res.ok) {
         toastGeminiFailure(res);
@@ -1377,7 +1391,6 @@
   function initLeakageAudit() {
     const btn = document.getElementById('leakageBtn');
     const label = document.getElementById('leakageLabel');
-    const iconEl = document.getElementById('leakageIcon');
     const resultEl = document.getElementById('leakageResult');
     if (!btn || !resultEl) return;
 
@@ -1398,8 +1411,8 @@
       }
 
       btn.disabled = true;
+      btn.classList.add('btn-loading');
       if (label) label.textContent = 'Auditing with Gemini…';
-      if (iconEl) iconEl.classList.add('ic-spin');
 
       const prompt =
         'You are an M-PESA cost auditor. Below are my M-PESA transactions from roughly the last 30 days as JSON.\n' +
@@ -1415,8 +1428,8 @@
       const res = await callGemini(prompt, { temperature: 0.15, maxOutputTokens: 700 });
 
       btn.disabled = false;
+      btn.classList.remove('btn-loading');
       if (label) label.textContent = 'Audit My M-PESA Fees';
-      if (iconEl) iconEl.classList.remove('ic-spin');
 
       if (res.ok) {
         resultEl.classList.add('is-open');
@@ -1449,7 +1462,6 @@
     const logEl = document.getElementById('chatLog');
     const input = document.getElementById('chatInput');
     const sendBtn = document.getElementById('chatSendBtn');
-    const sendIcon = document.getElementById('chatSendIcon');
     if (!logEl || !input || !sendBtn) return;
 
     document.querySelectorAll('.ai-chip[data-suggest]').forEach(chip => {
@@ -1477,11 +1489,14 @@
 
       input.value = '';
       appendChatBubble(logEl, 'user', question);
-      const thinking = appendChatBubble(logEl, 'ai', 'Thinking…');
+      // Apple-style typing indicator — three soft-pulsing dots in the AI
+      // bubble (no more spinning send icon).
+      const thinking = appendChatBubble(logEl, 'ai', '…');
       thinking.classList.add('chat-bubble--thinking');
+      thinking.innerHTML = '<span class="chat-typing"><i></i><i></i><i></i></span>';
+      thinking.setAttribute('aria-label', 'Waiting for Gemini');
 
       sendBtn.disabled = true;
-      if (sendIcon) sendIcon.classList.add('ic-spin');
 
       const prompt =
         'You are the user’s private M-PESA wallet assistant (Kenya, currency KES). ' +
@@ -1495,7 +1510,6 @@
       const res = await callGemini(prompt, { temperature: 0.25, maxOutputTokens: 800 });
 
       sendBtn.disabled = false;
-      if (sendIcon) sendIcon.classList.remove('ic-spin');
       thinking.classList.remove('chat-bubble--thinking');
 
       if (res.ok) {
@@ -1547,14 +1561,10 @@
     const photoInput = document.getElementById('photoInput');
     const changeBtn = document.getElementById('changePhotoBtn');
     const removeBtn = document.getElementById('removePhotoBtn');
-    const avatarBtn = document.getElementById('avatarBtn');
     const modal = document.getElementById('photoModal');
 
-    if (avatarBtn) {
-      avatarBtn.addEventListener('click', () => {
-        if (photoInput) photoInput.click();
-      });
-    }
+    // Header avatar is display-only (v4.4): tapping it does nothing.
+    // Changing the photo is reserved for Settings > Profile Photo.
     if (changeBtn && photoInput) {
       changeBtn.addEventListener('click', () => photoInput.click());
     }

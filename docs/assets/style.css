@@ -1780,3 +1780,105 @@ html, body {
   padding: 0;
   border-radius: 50%;
 }
+
+/* ===========================================================
+   v4.4 — ALIVE GLASS · FLUID MOTION · TYPING-DOTS LOADING
+   All animation is transform/opacity-only (compositor) so the
+   app stays feather-light at 60fps.
+   =========================================================== */
+
+/* --- Chat "typing" indicator: three soft-pulsing dots --- */
+.chat-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 14px;
+  padding: 2px 1px;
+}
+.chat-typing i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--app-muted);
+  opacity: .35;
+  animation: v4-typing 1.15s ease-in-out infinite;
+}
+.chat-typing i:nth-child(2) { animation-delay: .18s; }
+.chat-typing i:nth-child(3) { animation-delay: .36s; }
+@keyframes v4-typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: .35; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* --- Gentle busy pulse on AI action buttons (no spinning icons) --- */
+.btn-loading {
+  animation: v4-btn-pulse 1.4s ease-in-out infinite;
+}
+@keyframes v4-btn-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}
+
+/* --- Header avatar is display-only now --- */
+.dash-avatar { cursor: default; }
+
+/* --- Fluid page transitions: single elegant view-enter per tab --- */
+.app-tab-view.is-active > * { animation: none; } /* replaces stacked v3-rise */
+.app-tab-view.is-active {
+  animation: v4-view-in .38s cubic-bezier(.22, .9, .28, 1) both;
+}
+@keyframes v4-view-in {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --- Buttery scrolling --- */
+html { scroll-behavior: smooth; }
+.app-main-content {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* --- Living glass: the ambient gels drift almost imperceptibly --- */
+body::before {
+  animation: v4-ambient-drift 26s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes v4-ambient-drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(-2.5%, 2%, 0) scale(1.05); }
+  100% { transform: translate3d(2.5%, -2%, 0) scale(1.02); }
+}
+
+/* --- Tactile micro-interactions (press feedback, no layout cost) --- */
+* { -webkit-tap-highlight-color: transparent; }
+
+.tx { transition: background-color .15s ease, transform .12s ease; }
+.tx:active { transform: scale(.99); }
+
+.icon-btn-round { transition: transform .15s ease, box-shadow .18s ease; }
+.icon-btn-round:active { transform: scale(.92); }
+
+.dock-item { transition: background-color .18s ease, color .18s ease, transform .15s ease; }
+.dock-item.is-active {
+  animation: v4-dock-pop .3s cubic-bezier(.34, 1.56, .64, 1) both;
+}
+@keyframes v4-dock-pop {
+  from { transform: scale(.82); }
+  to   { transform: scale(1); }
+}
+
+.stat strong, .mini-stat-val, .balance-amount { transition: color .3s ease; }
+
+/* --- Respect users who prefer reduced motion --- */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .app-tab-view.is-active,
+  body::before,
+  .chat-typing i,
+  .btn-loading,
+  .dock-item.is-active {
+    animation: none !important;
+  }
+  .tx, .icon-btn-round, .dock-item { transition: none !important; }
+}
