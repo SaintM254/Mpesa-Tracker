@@ -21,6 +21,9 @@
   // v5.5: AI gets the WHOLE ledger — complete yearly/monthly/category /
   // counterparty/fee/Fuliza aggregates + raw recent rows (no more
   // "no data for 2024" with history to 2021) · full-history fees audit
+  // v5.6: Send Money + Miscellaneous categories · AI smarts: EVERY
+  // counterparty indexed (person totals always answerable) · largest
+  // expenses pre-computed · prose-only answers · full output budget
   // ========================================================
 
   const STORAGE_KEY_TX = 'mpesa_tracker_tx_db_v4'; // fresh namespace: no legacy mock data
@@ -62,6 +65,8 @@
     savings: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
     income: '<circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12l4 4 4-4"/>',
     needs_review: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+    send_money: '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
+    misc: '<circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none"/>',
     tag: '<path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.42 0l8.58-8.58a1 1 0 0 0 0-1.42z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/>',
     trending_up: '<path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>',
     trending_down: '<path d="m22 17-8.5-8.5-5 5L2 7"/><path d="M16 17h6v-6"/>'
@@ -82,6 +87,8 @@
     rent:          { key: 'rent',         name: 'Rent & housing', icon: 'rent',         class: 'tx-icon--rent',      color: '#00897b' },
     savings:       { key: 'savings',      name: 'Savings',        icon: 'savings',      class: 'tx-icon--savings',   color: '#3949ab' },
     income:        { key: 'income',       name: 'Income',         icon: 'income',       class: 'tx-icon--received',  color: '#2e7d32' },
+    send_money:    { key: 'send_money',   name: 'Send Money',     icon: 'send_money',   class: 'tx-icon--send',      color: '#00acc1' },
+    misc:          { key: 'misc',         name: 'Miscellaneous',  icon: 'misc',         class: 'tx-icon--misc',      color: '#8d6e63' },
     needs_review:  { key: 'needs_review', name: 'Needs review',   icon: 'needs_review', class: 'tx-icon--review',    color: '#78909c' }
   };
 
@@ -119,7 +126,10 @@
       const stored = localStorage.getItem(STORAGE_KEY_TX);
       if (stored) {
         const parsed = JSON.parse(stored);
+        // v5.6: always present newest-first, even if a stored ledger ever
+        // ended up out of order (imports sort; this guards every other path).
         db = Array.isArray(parsed) ? parsed : [];
+        db.sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
       } else {
         db = [];
       }
@@ -610,7 +620,7 @@
   // Shared transaction row — used by Dashboard and the All Transactions screen,
   // so edits made on either screen stay in sync (both render from the same db).
   function buildTxRow(tx) {
-    const cat = CATEGORIES[tx.category] || CATEGORIES.shopping;
+    const cat = CATEGORIES[tx.category] || CATEGORIES.misc;
     const isIn = tx.type === 'received';
     const sign = isIn ? '+' : '−';
     const amtClass = isIn ? 'tx-amount--in' : 'tx-amount--out';
@@ -844,7 +854,7 @@
     const maxVal = entries.length ? Math.max(...entries.map(e => e[1])) : 1;
 
     entries.forEach(([catKey, total]) => {
-      const cat = CATEGORIES[catKey] || CATEGORIES.shopping;
+      const cat = CATEGORIES[catKey] || CATEGORIES.misc;
       const percent = Math.min(100, Math.round((total / maxVal) * 100));
 
       const row = document.createElement('div');
@@ -1545,7 +1555,7 @@
     return rows.slice(0, limit || 120).map(t => ({
       d: t.datetime || '',
       t: t.type || 'sent',
-      c: t.category || 'shopping',
+      c: t.category || 'misc',
       p: (t.counterparty || '').slice(0, 40),
       a: Number(t.amount || 0),
       f: Number(t.cost || 0)
@@ -1563,6 +1573,7 @@
   function aiLedgerSummary() {
     const pad = n => String(n).padStart(2, '0');
     const iso = ts => { const d = new Date(ts); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+    const ym = ts => { const d = new Date(ts); return d.getFullYear() + '-' + pad(d.getMonth() + 1); };
     const monthly = new Map();
     const yearly = new Map();
     const catByYear = new Map();
@@ -1591,17 +1602,37 @@
       bump(monthly, m);
       bump(yearly, y);
       if (!isIn) {
-        const ck = y + '|' + (t.category || 'shopping');
+        const ck = y + '|' + (t.category || 'misc');
         catByYear.set(ck, (catByYear.get(ck) || 0) + amt);
       }
+      // Case-insensitive merge so "KEVIN MMBADI" and "Kevin Mmbadi" are one person
       const name = (t.counterparty || 'Unknown').slice(0, 36);
-      const p = people.get(name) || { n: 0, s: 0, r: 0, first: ts, last: ts };
+      const nameKey = name.toUpperCase();
+      const p = people.get(nameKey) || { disp: name, n: 0, s: 0, r: 0, first: ts, last: ts };
       p.n++;
       if (isIn) p.r += amt; else p.s += amt;
       if (ts < p.first) p.first = ts;
       if (ts > p.last) p.last = ts;
-      people.set(name, p);
+      people.set(nameKey, p);
     });
+    // v5.6: EVERY counterparty is indexed (not just a top-40). The v5.5 bug:
+    // "Total sent to Kevin Mmbadi" failed because he wasn't in the top 40.
+    // Compact tuples keep the prompt small even with hundreds of names.
+    const counterparties = [...people.values()]
+      .sort((a, b) => (b.s + b.r) - (a.s + a.r))
+      .slice(0, 400)
+      .map(p => [p.disp, p.s, p.r, p.n, iso(p.first), iso(p.last)]);
+    // Largest single expenses — pre-computed so "biggest expense" questions
+    // are exact instead of hallucinated from a row slice.
+    const sentRows = db.filter(t => t.type !== 'received');
+    const amountDesc = (a, b) => Number(b.amount || 0) - Number(a.amount || 0);
+    const nowYm = ym(Date.now());
+    const largestExpensesAllTime = sentRows.slice().sort(amountDesc).slice(0, 8)
+      .map(t => [(t.counterparty || '').slice(0, 36), Number(t.amount || 0), ym(Number(t.timestamp || 0))]);
+    const largestExpensesThisMonth = sentRows
+      .filter(t => ym(Number(t.timestamp || 0)) === nowYm)
+      .sort(amountDesc).slice(0, 8)
+      .map(t => [(t.counterparty || '').slice(0, 36), Number(t.amount || 0), iso(Number(t.timestamp || 0))]);
     return {
       coverage: {
         from: oldest ? iso(oldest) : null,
@@ -1611,10 +1642,11 @@
       byYear: [...yearly.entries()].sort().map(([y, o]) => ({ y, sent: o.s, received: o.r, fees: o.f, fuliza: o.z, count: o.n })),
       byMonth: [...monthly.entries()].sort().map(([m, o]) => ({ m, sent: o.s, received: o.r, fees: o.f, fuliza: o.z })),
       spendByCategoryYear: [...catByYear.entries()].sort().map(([k, total]) => { const [y, c] = k.split('|'); return { year: Number(y), category: c, total }; }),
-      topCounterparties: [...people.entries()]
-        .sort((a, b) => (b[1].s + b[1].r) - (a[1].s + a[1].r))
-        .slice(0, 40)
-        .map(([name, p]) => ({ name, sent: p.s, received: p.r, count: p.n, first: iso(p.first), last: iso(p.last) }))
+      counterpartyTupleFields: 'name,sentTotal,receivedTotal,txCount,firstDate,lastDate',
+      counterparties,
+      omittedCounterparties: Math.max(0, people.size - 400),
+      largestExpensesThisMonth,
+      largestExpensesAllTime
     };
   }
 
@@ -1793,9 +1825,9 @@
         '3) One line on Fuliza usage share.\n' +
         '4) End with ONE concrete saving tip including an estimated KES saving for next month.\n' +
         'Format EXACTLY:\nTotal lifetime leakage: KES X\n• line\n• line\n• line\nTip: ...\n' +
-        'Plain text only, under 100 words.';
+        'Plain natural prose only, under 100 words. Never echo raw keys, JSON or field letters.';
 
-      const res = await callGemini(prompt, { temperature: 0.15, maxOutputTokens: 700 });
+      const res = await callGemini(prompt, { temperature: 0.15, maxOutputTokens: 2048 });
 
       btn.disabled = false;
       btn.classList.remove('btn-loading');
@@ -1871,18 +1903,24 @@
       const summary = aiLedgerSummary();
       const prompt =
         'You are the user’s private M-PESA wallet assistant (Kenya, currency KES).\n' +
-        'You are given (A) a COMPLETE statistical summary of the ENTIRE ledger — every transaction from ' +
-        (summary.coverage.from || '?') + ' to ' + (summary.coverage.to || '?') + ' (' + summary.coverage.transactions + ' records), ' +
-        'bucketed by year, month, category and counterparty, INCLUDING per-period fees and Fuliza — and (B) the raw newest 100 rows for day-level detail.\n' +
-        'RULES: answer ANY year/month/category/person/fee/Fuliza question from (A) — it covers the WHOLE history, so NEVER claim a period has no data if the summary covers it. ' +
-        'Compute totals exactly; format amounts like "KES 1,250"; say when a total spans several years; if several people share a first name, say which names matched; ' +
-        'only if BOTH (A) and (B) genuinely lack the granularity asked, state plainly what is missing. ' +
-        'Max 100 words. Plain text only.\n' +
+        'You see my ENTIRE ledger through two lenses:\n' +
+        '(A) SUMMARY — complete aggregates for every transaction from ' + (summary.coverage.from || '?') + ' to ' + (summary.coverage.to || '?') +
+        ' (' + summary.coverage.transactions + ' records): per-year & per-month sent/received/fees/Fuliza/count, spend per category per year, ' +
+        'the largest single expenses overall and this month, and counterparties — EVERY distinct counterparty as tuples ' +
+        '[name, sentTotal, receivedTotal, txCount, firstDate, lastDate]; NOTHING is omitted.\n' +
+        '(B) RECENT ROWS — the raw newest 100 transactions for day-level detail.\n' +
+        'RULES:\n' +
+        '- Person questions (e.g. "total sent to Kevin Mmbadi") come from the counterparties list: every name IS there, so NEVER say someone ' +
+        '"does not appear" — sum every name that matches and give the exact total with the period covered.\n' +
+        '- "Biggest expense" answers come from the pre-computed largest-expense lists — state the exact amount and date.\n' +
+        '- Answer any year/month/category/fee/Fuliza question from (A); never claim a covered period is empty.\n' +
+        '- Natural prose ONLY, amounts formatted "KES 1,250" — never echo raw field letters (like a:70, f:0), JSON keys or code fragments.\n' +
+        '- Compute totals exactly; stay under 100 words.\n' +
         'SUMMARY: ' + JSON.stringify(summary) + '\n' +
         'RECENT ROWS (newest 100, d=date&time t=type c=category p=counterparty a=amount f=fee): ' + JSON.stringify(aiSnapshot(db, 100)) + '\n' +
         'QUESTION: ' + question;
 
-      const res = await callGemini(prompt, { temperature: 0.25, maxOutputTokens: 800 });
+      const res = await callGemini(prompt, { temperature: 0.25, maxOutputTokens: 2048 });
 
       sendBtn.disabled = false;
       thinking.classList.remove('chat-bubble--thinking');

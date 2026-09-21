@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag (e.g. v5.5)"
+        description: "Release tag (e.g. v5.6)"
         required: true
-        default: "v5.5"
+        default: "v5.6"
       release_name:
         description: "Release display name"
         required: true
-        default: "M-PESA Tracker v5.5"
+        default: "M-PESA Tracker v5.6"
   push:
     branches: [main, 'arena/**']
 
@@ -219,23 +219,17 @@ jobs:
           # the tag silently lands on the default branch's HEAD instead.
           target_commitish: ${{ github.sha }}
           body: |
-            ## M-PESA Tracker v5.5 — Android APK
+            ## M-PESA Tracker v5.6 — Android APK
 
-            ### 🧠 AI now sees your WHOLE ledger
-            Root cause of the screenshot bug: every AI feature only received the **newest 140 raw rows**. With history back to 2021, Gemini literally could not see older years — then confidently (and wrongly) answered "no transactions exist for 2024".
+            ### 🏷️ Two new categories
+            **Send Money** (cyan, person-transfer icon) and **Miscellaneous** (brown) are now first-class categories — in the recategorize picker (tap any transaction), the Categories tab, analytics and CSV export. Needs review stays the default for person payments (your v5.3 rule), so you can now file them under Send Money as you review — the app learns them.
 
-            **v5.5 gives every AI feature a complete local-computed summary of the ENTIRE ledger:**
-            - Coverage header: date range + total record count (ground truth — the model can never claim a covered period is empty).
-            - Per-year and per-month buckets: sent / received / **fees** / **Fuliza** / counts.
-            - Spend per category per year + top-40 counterparties with first/last seen dates.
-            - Same privacy fields as before (dates, categories, names, amounts, fees) — codes, phones and balances still never leave the device.
-            - Raw newest 100 rows stay attached for day-level questions.
-            Powers **Chat with your Wallet** (ask "KPLC total in 2024" — it now answers from 2021→today), the **AI Report CSV** and the fees audit.
+            ### 🧠 AI intelligence: the two remaining blindspots closed
+            1. **Person totals failed.** "Total sent to Kevin Mmbadi" answered "Kevin does not appear…" because only the top-40 counterparties were shared. Now **EVERY distinct counterparty** is indexed (compact tuple: name, totals, count, first/last seen), case-merged — the model is explicitly told never to claim a person is absent. Person questions get exact sums.
+            2. **"Biggest expense" hallucinated + truncated.** The answer spewed raw field shorthand ("ONY MWATAME, a:70, f:0") then cut off mid-sentence — the 800-token output budget was too small for Gemini 3.x, and nothing pre-computed the answer. Now: output budget raised to 2048, largest-expenses are pre-computed locally (all-time AND this month), and the prompt demands natural prose with KES formatting — no field letters, no JSON fragments.
+            The leakage audit gets the same 2048 budget + prose rule (its answer truncated mid-bullet too).
 
-            ### 🧾 Fees & Fuliza audit: full history
-            Was: last 30 days (or newest 200 rows). Now: **every parsed fee across your entire history**, bucketed per year and month — the AI audit reports lifetime totals, most expensive year/month, trend direction and Fuliza share, and the offline fallback panel shows the same lifetime math with a per-year breakdown.
-
-            Everything from v5.0–v5.4 stays. Installs on top — pinned signature.
+            Everything from v5.0–v5.5 stays. Installs on top — pinned signature.
 
             SHA-256 checksums are in `SHA256SUMS.txt`.
           draft: false

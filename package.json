@@ -1,7 +1,7 @@
 {
   "name": "mpesa-tracker",
   "private": true,
-  "version": "5.5.0",
+  "version": "5.6.0",
   "description": "Android app that tracks M-PESA transactions from SMS",
   "scripts": {
     "sync": "cap sync android",
