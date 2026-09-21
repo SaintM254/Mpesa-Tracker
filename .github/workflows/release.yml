@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag (e.g. v5.6)"
+        description: "Release tag (e.g. v5.7)"
         required: true
-        default: "v5.6"
+        default: "v5.7"
       release_name:
         description: "Release display name"
         required: true
-        default: "M-PESA Tracker v5.6"
+        default: "M-PESA Tracker v5.7"
   push:
     branches: [main, 'arena/**']
 
@@ -219,17 +219,13 @@ jobs:
           # the tag silently lands on the default branch's HEAD instead.
           target_commitish: ${{ github.sha }}
           body: |
-            ## M-PESA Tracker v5.6 — Android APK
+            ## M-PESA Tracker v5.7 — Android APK
 
-            ### 🏷️ Two new categories
-            **Send Money** (cyan, person-transfer icon) and **Miscellaneous** (brown) are now first-class categories — in the recategorize picker (tap any transaction), the Categories tab, analytics and CSV export. Needs review stays the default for person payments (your v5.3 rule), so you can now file them under Send Money as you review — the app learns them.
+            ### 🐘 New app icon + full README
+            - The placeholder green-**M** logo is replaced by the app's true elephant-leaf icon (favicon now matches the launcher artwork — used in Settings and the README banner).
+            - The README has been rewritten from scratch and now documents **every shipped feature**: deep inbox scan with first-run progress, monthly dashboard + analytics, 11 interactive categories with Needs-review learning, the optional full-ledger Gemini AI (chat, fees & Fuliza audit, report CSV), CSV export, themes incl. AMOLED, profile photo cropping, privacy/offline architecture, tech stack and build instructions.
 
-            ### 🧠 AI intelligence: the two remaining blindspots closed
-            1. **Person totals failed.** "Total sent to Kevin Mmbadi" answered "Kevin does not appear…" because only the top-40 counterparties were shared. Now **EVERY distinct counterparty** is indexed (compact tuple: name, totals, count, first/last seen), case-merged — the model is explicitly told never to claim a person is absent. Person questions get exact sums.
-            2. **"Biggest expense" hallucinated + truncated.** The answer spewed raw field shorthand ("ONY MWATAME, a:70, f:0") then cut off mid-sentence — the 800-token output budget was too small for Gemini 3.x, and nothing pre-computed the answer. Now: output budget raised to 2048, largest-expenses are pre-computed locally (all-time AND this month), and the prompt demands natural prose with KES formatting — no field letters, no JSON fragments.
-            The leakage audit gets the same 2048 budget + prose rule (its answer truncated mid-bullet too).
-
-            Everything from v5.0–v5.5 stays. Installs on top — pinned signature.
+            Identical runtime to v5.6 — docs and icon only. Installs on top — pinned signature.
 
             SHA-256 checksums are in `SHA256SUMS.txt`.
           draft: false
