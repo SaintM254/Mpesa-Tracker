@@ -2,7 +2,9 @@
 
 A private, **offline-first** Android app that turns your M-PESA confirmation SMS into a clean, categorized spending ledger — no accounts, no servers, no mock data. Your financial history never leaves your phone unless you explicitly ask the optional AI for help.
 
-![M-PESA Tracker](docs/assets/favicon.svg)
+<p align="center">
+  <img src="docs/assets/favicon.svg" alt="M-PESA Tracker app icon" width="96" />
+</p>
 
 ---
 
@@ -101,4 +103,4 @@ Everything else stays off. Delete the app = delete the data.
 
 ---
 
-*Current release: **v5.7** — see [Releases](https://github.com/SaintM254/Mpesa-Tracker/releases) for the full changelog.*
+*Current release: **v5.6** — see [Releases](https://github.com/SaintM254/Mpesa-Tracker/releases) for the full changelog.*
