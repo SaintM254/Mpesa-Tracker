@@ -7,8 +7,8 @@ android {
         applicationId "com.saintm254.mpesatracker"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 14
+        versionName "5.6"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -24,6 +24,7 @@ android {
             def ksPass = System.getenv('KEYSTORE_PASS')
             def kAlias = System.getenv('KEY_ALIAS')
             def kPass  = System.getenv('KEY_PASS')
+            def kType  = System.getenv('KEYSTORE_TYPE')
 
             if (ksFile == null) {
                 def propsFile = rootProject.file('keystore.properties')
@@ -34,6 +35,7 @@ android {
                     ksPass = props.getProperty('storePassword')
                     kAlias = props.getProperty('keyAlias')
                     kPass  = props.getProperty('keyPassword')
+                    kType  = props.getProperty('storeType')
                 }
             }
 
@@ -42,6 +44,9 @@ android {
                 storePassword ksPass
                 keyAlias      kAlias
                 keyPassword   kPass
+                if (kType != null && kType.trim().length() > 0) {
+                    storeType kType
+                }
             }
         }
     }

@@ -18,11 +18,9 @@ android/app/src/main/assets/public/
 android/app/src/main/assets/capacitor.config.json
 android/app/src/main/assets/capacitor.plugins.json
 
-# Sign / keystores — DO NOT commit
-*.jks
-*.keystore
-keystore.properties
-android/keystore.properties
+# Sign / keystores — the release key IS committed on purpose so every CI
+# build signs identically and APK updates install on top of each other.
+# (Rotate by replacing android/app/signing/release.p12 + android/keystore.properties.)
 
 # IDE / OS
 .DS_Store

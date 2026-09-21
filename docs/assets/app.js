@@ -2,34 +2,102 @@
   'use strict';
 
   // ========================================================
-  // M-PESA TRACKER — OFFLINE M-PESA SMS EXPENSE ENGINE
+  // M-PESA TRACKER v5.1 — OFFLINE-FIRST M-PESA SMS ENGINE
+  // Zero-mock ledger · SAF CSV export · optional Gemini AI · photo cropping
+  // Glassmorphism UI · Floating pill dock · Apple-style polish
+  // Gemini model fallback · Fees & Fuliza leakage audit · Wallet chat
+  // v3.1.1: boot hardening — isolated init steps
+  // v4.4: live model chain (1.5/2.0 retired 2025-26) · typing-dots
+  // loading · avatar tap inert · fluid glass motion
+  // v5.0: DEEP inbox paging (first-ever message, not last 500) · AMOLED
+  // theme w/ AA contrast · theme control lives in Settings only
+  // v5.1: v3.1.0 interaction model restored (motion tax removed)
+  // v5.3: monthly dashboard totals · header ghost removed · Gemini
+  // rolls through 5xx/429 · counterparty-only category rules
+  // (people sends → Needs review) · interactive categories · tidy toast
+  // v5.4: bulk import (1 sort + 1 save per batch — kills first-load
+  // freeze) · first-run floating progress overlay · lazy accordion
+  // bodies · render-active-view-only edits · sticky category expansion
+  // v5.5: AI gets the WHOLE ledger — complete yearly/monthly/category /
+  // counterparty/fee/Fuliza aggregates + raw recent rows (no more
+  // "no data for 2024" with history to 2021) · full-history fees audit
+  // v5.6: Send Money + Miscellaneous categories · AI smarts: EVERY
+  // counterparty indexed (person totals always answerable) · largest
+  // expenses pre-computed · prose-only answers · full output budget
   // ========================================================
 
-  const STORAGE_KEY_TX = 'mpesa_tracker_tx_db_v3';
+  const STORAGE_KEY_TX = 'mpesa_tracker_tx_db_v4'; // fresh namespace: no legacy mock data
   const STORAGE_KEY_THEME = 'mpesa_tracker_theme';
   const STORAGE_KEY_USER = 'mpesa_tracker_user_name';
   const STORAGE_KEY_RULES = 'mpesa_tracker_cat_rules';
   const STORAGE_KEY_PERM_DISMISSED = 'mpesa_tracker_perm_dismissed';
+  const STORAGE_KEY_PHOTO = 'mpesa_tracker_user_photo';
+  const STORAGE_KEY_GEMINI = 'mpesa_tracker_gemini_key';
 
-  // Available Categories (Solid rounded Material Icons Round)
+  const DEFAULT_USER_NAME = 'M-PESA User';
+
+  // Gemini: standard v1beta endpoint + ordered fallback chain. If the primary
+  // model is retired/renamed (HTTP 404) we roll cleanly to the next one.
+  const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
+  // Sept 2026 reality: gemini-1.5-* retired Sept 2025 and the gemini-2.0-*
+  // family shut down 1 June 2026 — the old chain 404'd everywhere, which is
+  // the "Gemini AI feature failed" users saw. This chain holds only models
+  // alive today; any 404 still rolls cleanly to the next.
+  const GEMINI_MODELS = [
+    'gemini-3.8-flash',
+    'gemini-3.5-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-flash'
+  ];
+  const GEMINI_TIMEOUT_MS = 30000;
+
+  // ========================================================
+  // INLINE SVG ICON SYSTEM (no webfont — crisp vectors, zero text bleed)
+  // ========================================================
+  const ICON_PATHS = {
+    food: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/>',
+    transport: '<rect x="4" y="3" width="16" height="13" rx="2.5"/><path d="M4 10h16"/><path d="M7 16v3"/><path d="M17 16v3"/><path d="M8 13h.01"/><path d="M16 13h.01"/>',
+    airtime: '<rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/>',
+    utilities: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
+    shopping: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+    rent: '<path d="M3 9.5 12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22v-8h6v8"/>',
+    savings: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+    income: '<circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12l4 4 4-4"/>',
+    needs_review: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+    send_money: '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
+    misc: '<circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none"/>',
+    tag: '<path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.42 0l8.58-8.58a1 1 0 0 0 0-1.42z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/>',
+    trending_up: '<path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>',
+    trending_down: '<path d="m22 17-8.5-8.5-5 5L2 7"/><path d="M16 17h6v-6"/>'
+  };
+
+  function icon(name, extraClass) {
+    const paths = ICON_PATHS[name] || ICON_PATHS.needs_review;
+    return '<svg class="ic' + (extraClass ? ' ' + extraClass : '') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths + '</svg>';
+  }
+
+  // Available Categories (inline SVG glyph keys)
   const CATEGORIES = {
-    food:          { key: 'food',          name: 'Food & drinks',   icon: 'restaurant',     class: 'tx-icon--food',       color: '#ef6c00' },
-    transport:     { key: 'transport',     name: 'Transport',       icon: 'directions_bus', class: 'tx-icon--transport',  color: '#1e88e5' },
-    airtime:       { key: 'airtime',       name: 'Airtime',         icon: 'phone_android',  class: 'tx-icon--airtime',    color: '#8e24aa' },
-    utilities:     { key: 'utilities',     name: 'Utilities',       icon: 'bolt',           class: 'tx-icon--utilities',  color: '#fbc02d' },
-    shopping:      { key: 'shopping',      name: 'Shopping',        icon: 'shopping_bag',   class: 'tx-icon--shopping',   color: '#d81b60' },
-    rent:          { key: 'rent',          name: 'Rent & housing',  icon: 'home',           class: 'tx-icon--rent',       color: '#00897b' },
-    savings:       { key: 'savings',       name: 'Savings',         icon: 'savings',        class: 'tx-icon--savings',    color: '#3949ab' },
-    income:        { key: 'income',        name: 'Income',          icon: 'arrow_downward', class: 'tx-icon--received',   color: '#2e7d32' },
-    needs_review:  { key: 'needs_review',  name: 'Needs review',    icon: 'help_outline',   class: 'tx-icon--review',     color: '#78909c' }
+    food:          { key: 'food',         name: 'Food & drinks',  icon: 'food',         class: 'tx-icon--food',      color: '#ef6c00' },
+    transport:     { key: 'transport',    name: 'Transport',      icon: 'transport',    class: 'tx-icon--transport', color: '#1e88e5' },
+    airtime:       { key: 'airtime',      name: 'Airtime',        icon: 'airtime',      class: 'tx-icon--airtime',   color: '#8e24aa' },
+    utilities:     { key: 'utilities',    name: 'Utilities',      icon: 'utilities',    class: 'tx-icon--utilities', color: '#fbc02d' },
+    shopping:      { key: 'shopping',     name: 'Shopping',       icon: 'shopping',     class: 'tx-icon--shopping',  color: '#d81b60' },
+    rent:          { key: 'rent',         name: 'Rent & housing', icon: 'rent',         class: 'tx-icon--rent',      color: '#00897b' },
+    savings:       { key: 'savings',      name: 'Savings',        icon: 'savings',      class: 'tx-icon--savings',   color: '#3949ab' },
+    income:        { key: 'income',       name: 'Income',         icon: 'income',       class: 'tx-icon--received',  color: '#2e7d32' },
+    send_money:    { key: 'send_money',   name: 'Send Money',     icon: 'send_money',   class: 'tx-icon--send',      color: '#00acc1' },
+    misc:          { key: 'misc',         name: 'Miscellaneous',  icon: 'misc',         class: 'tx-icon--misc',      color: '#8d6e63' },
+    needs_review:  { key: 'needs_review', name: 'Needs review',   icon: 'needs_review', class: 'tx-icon--review',    color: '#78909c' }
   };
 
   // Default initial rules for category guessing based on counterparty / keyword
   const DEFAULT_RULES = {
     'JAVA': 'food', 'KFC': 'food', 'BURGER': 'food', 'PIZZA': 'food', 'ARTCAFFE': 'food', 'CAFE': 'food',
     'RESTAURANT': 'food', 'COFFEE': 'food', 'CHOMA': 'food', 'BAKERY': 'food', 'CHEF': 'food',
-    'MATATU': 'transport', 'KENYATTA': 'transport', 'UBER': 'transport', 'BOLT': 'transport',
-    'METRO': 'transport', 'BUS': 'transport', 'FARE': 'transport', 'TRANS': 'transport', 'TOTAL': 'transport',
+    'MATATU': 'transport', 'UBER': 'transport', 'BOLT': 'transport', 'BODA': 'transport',
+    'TAXI': 'transport', 'FARE': 'transport', 'SHELL': 'transport', 'RUBIS': 'transport', 'TOTAL': 'transport',
     'SAFARICOM AIRTIME': 'airtime', 'AIRTIME': 'airtime', 'BUNDLE': 'airtime', 'DATA': 'airtime',
     'KPLC': 'utilities', 'PREPAID': 'utilities', 'TOKENS': 'utilities', 'WATER': 'utilities', 'POWER': 'utilities',
     'NAIVAS': 'shopping', 'CARREFOUR': 'shopping', 'QUICKMART': 'shopping', 'SUPERMARKET': 'shopping', 'MALL': 'shopping',
@@ -37,79 +105,18 @@
     'SAVINGS': 'savings', 'MSHWARI': 'savings', 'KCB': 'savings', 'LOCK': 'savings'
   };
 
-  // Seed sample transactions if DB is completely fresh
-  const SEED_TRANSACTIONS = [
-    {
-      code: 'UHK1A2B3C1',
-      amount: 850,
-      type: 'sent',
-      category: 'food',
-      counterparty: 'Java House — Westlands',
-      datetime: 'Today 12:42 PM',
-      timestamp: Date.now() - (2 * 3600 * 1000),
-      balance: 4120,
-      cost: 0
-    },
-    {
-      code: 'UHK1A2B3C2',
-      amount: 100,
-      type: 'sent',
-      category: 'transport',
-      counterparty: 'Matatu · Kenyatta Ave',
-      datetime: 'Today 08:15 AM',
-      timestamp: Date.now() - (6 * 3600 * 1000),
-      balance: 4970,
-      cost: 0
-    },
-    {
-      code: 'UHK1A2B3C3',
-      amount: 200,
-      type: 'airtime',
-      category: 'airtime',
-      counterparty: 'Safaricom airtime',
-      datetime: 'Yesterday 19:08',
-      timestamp: Date.now() - (24 * 3600 * 1000),
-      balance: 5070,
-      cost: 0
-    },
-    {
-      code: 'UHK1A2B3C4',
-      amount: 45000,
-      type: 'received',
-      category: 'income',
-      counterparty: 'Salary — Acme Ltd',
-      datetime: 'Yesterday 09:01',
-      timestamp: Date.now() - (30 * 3600 * 1000),
-      balance: 5270,
-      cost: 0
-    },
-    {
-      code: 'UHK1A2B3C5',
-      amount: 1500,
-      type: 'sent',
-      category: 'utilities',
-      counterparty: 'KPLC prepaid tokens',
-      datetime: '02 Sep 16:20',
-      timestamp: Date.now() - (5 * 86400 * 1000),
-      balance: 38270,
-      cost: 23
-    },
-    {
-      code: 'UHK1A2B3C6',
-      amount: 3450,
-      type: 'sent',
-      category: 'shopping',
-      counterparty: 'Naivas Supermarket',
-      datetime: '01 Sep 14:10',
-      timestamp: Date.now() - (7 * 86400 * 1000),
-      balance: 39770,
-      cost: 0
-    }
-  ];
-
-  // In-Memory App State
+  // In-Memory App State — always starts empty unless the user's own data exists
   let db = [];
   let userCategoryRules = {};
+  let inboxScanInProgress = false;
+  let liveSmsListenerAttached = false;
+
+  // UI state (persists across re-renders & tab switches, in-memory only)
+  let selectedWeekDayKey = null;      // tapped bar in the weekly chart
+  const txGroupState = {};            // month/year accordion: key -> collapsed
+  let openCategoryKey = null;         // expanded category card survives re-renders (v5.4)
+  const tabScroll = {};               // per-tab scroll position
+  let activeTabId = 'view-dashboard';
 
   // ========================================================
   // PERSISTENCE & LOCAL DATABASE (Indexed by code for deduplication)
@@ -118,21 +125,32 @@
     try {
       const stored = localStorage.getItem(STORAGE_KEY_TX);
       if (stored) {
-        db = JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        // v5.6: always present newest-first, even if a stored ledger ever
+        // ended up out of order (imports sort; this guards every other path).
+        db = Array.isArray(parsed) ? parsed : [];
+        db.sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
       } else {
-        db = [...SEED_TRANSACTIONS];
-        saveDatabase();
+        db = [];
       }
     } catch (_) {
-      db = [...SEED_TRANSACTIONS];
+      db = [];
     }
 
     try {
       const storedRules = localStorage.getItem(STORAGE_KEY_RULES);
       userCategoryRules = storedRules ? JSON.parse(storedRules) : { ...DEFAULT_RULES };
+      // v5.3 cleanup: purge legacy junk tokens that mis-binned person transfers
+      const junk = ['KENYATTA', 'TRANS', 'BUS', 'METRO'];
+      if (junk.some(k => k in userCategoryRules)) {
+        junk.forEach(k => { delete userCategoryRules[k]; });
+        saveRules();
+      }
     } catch (_) {
       userCategoryRules = { ...DEFAULT_RULES };
     }
+
+    migrateLegacyTransportBias();
   }
 
   function saveDatabase() {
@@ -160,6 +178,30 @@
     return true;
   }
 
+  // Bulk import path for inbox scans: Set-based dedupe, ONE sort, ONE save
+  // per batch. The old per-message insert re-sorted and rewrote the ENTIRE
+  // db to localStorage for every single SMS — on a ~900-message first
+  // setup that strangled the UI thread until the import finished, which
+  // is exactly the "app is laggy until loading completes" freeze (v5.4).
+  function insertManyTransactions(list) {
+    if (!Array.isArray(list) || !list.length) return 0;
+    const seen = new Set();
+    db.forEach(t => { if (t && t.code) seen.add(String(t.code).toUpperCase()); });
+    const fresh = [];
+    for (const tx of list) {
+      if (!tx || !tx.code) continue;
+      const k = String(tx.code).toUpperCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      fresh.push(tx);
+    }
+    if (!fresh.length) return 0;
+    db = db.concat(fresh);
+    db.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    saveDatabase();
+    return fresh.length;
+  }
+
   // ========================================================
   // M-PESA SMS PARSER ENGINE (Robust regex, variations)
   // ========================================================
@@ -185,7 +227,8 @@
         datetime: formatFriendlyDate(fallbackTimestamp || Date.now()),
         timestamp: fallbackTimestamp || Date.now(),
         balance: null,
-        cost: null
+        cost: null,
+        phone: null
       };
     }
     const amount = parseFloat(amountMatch[1].replace(/,/g, ''));
@@ -199,9 +242,19 @@
 
     // 4. Transaction Cost: "Transaction cost, Ksh7.00"
     let cost = null;
-    const costMatch = body.match(/cost[,\s]+(?:Ksh|KSh|KES)\s*([0-9,]+(?:\.\d{1,2})?)/i);
+    // Covers "Transaction cost, Ksh23.00", "Transaction cost was Ksh10.00",
+    // and spacing/case variants
+    const costMatch = body.match(/cost[^0-9]{0,12}(?:Ksh|KSh|KES)\s*([0-9,]+(?:\.\d{1,2})?)/i);
     if (costMatch) {
       cost = parseFloat(costMatch[1].replace(/,/g, ''));
+    }
+
+    // 4b. Phone number (e.g. recipient MSISDN) — stored for the CSV only,
+    // never included in AI snapshots
+    let phone = null;
+    const phoneMatch = body.match(/(\+?254|0)\d{9}(?!\d)/);
+    if (phoneMatch) {
+      phone = phoneMatch[0];
     }
 
     // 5. Date & Time from message: "on 20/9/26 at 11:50 AM"
@@ -218,7 +271,7 @@
     let counterparty = 'M-PESA Merchant';
     let category = 'shopping';
 
-    const isReceived = /received|from|cashback/i.test(body) && !/sent to|paid to/i.test(body);
+    const isReceived = /received|deposited|cashback/i.test(body) && !/sent to|paid to/i.test(body);
     const isAirtime = /airtime/i.test(body);
     const isWithdraw = /withdraw/i.test(body);
     const isFuliza = /fuliza/i.test(body);
@@ -244,12 +297,13 @@
     } else {
       // Sent to or Paid to (Till / Paybill / P2P)
       type = 'sent';
-      const toMatch = body.match(/(?:paid to|sent to)\s+([A-Z0-9\s.,'&-]+?)(?:\s+on|\s+\d{4,}|\s+for|\s+New|\.|$)/i);
+      const toMatch = body.match(/(?:paid to|sent to|transferred to)\s+([A-Z0-9\s.,'&-]+?)(?:\s+on|\s+\d{4,}|\s+for|\s+New|\.|$)/i);
       counterparty = toMatch ? cleanCounterparty(toMatch[1]) : 'M-PESA Payment';
     }
 
-    // 7. Auto-categorize based on rules
-    if (type !== 'received') {
+    // 7. Auto-categorize based on rules (only fresh "sent" payments get
+    //    guessed — received/airtime/withdraw/fees keep preset buckets)
+    if (type === 'sent') {
       category = guessCategory(counterparty, body);
     }
 
@@ -262,7 +316,8 @@
       datetime: datetimeStr,
       timestamp: fallbackTimestamp || Date.now(),
       balance,
-      cost
+      cost,
+      phone
     };
   }
 
@@ -274,27 +329,62 @@
               .trim() || 'M-PESA Merchant';
   }
 
+  // Person-shaped counterparty? (two or more plain words, letters only,
+  // no digits, no business suffixes) — gates the "Needs review" bucket.
+  function isPersonName(cp) {
+    const s = (cp || '').trim();
+    if (s.length < 5 || /\d/.test(s)) return false;
+    if (/\bM-PESA\b/i.test(s)) return false;
+    if (!/^[A-Za-z.'\- ]+$/.test(s)) return false;
+    if (s.split(/\s+/).length < 2) return false;
+    if (/(BANK|SACCO|LIMITED|\bLTD\b|ENTERPRISES?|COMPANY|SCHOOL|CHURCH|CLINIC|HOSPITAL|HOTEL|SUPPLIERS?|AGENT)/i.test(s)) return false;
+    return true;
+  }
+
   function guessCategory(counterparty, fullBody) {
     const cpUpper = (counterparty || '').toUpperCase();
-    const bodyUpper = (fullBody || '').toUpperCase();
 
-    // Check user-remembered rules first
+    // 1) Rules the user taught us (recategorizing a row remembers the merchant)
     for (const [key, cat] of Object.entries(userCategoryRules)) {
       if (cpUpper.includes(key.toUpperCase())) {
         return cat;
       }
     }
 
-    // Built-in keyword fallbacks
-    if (/JAVA|KFC|BURGER|PIZZA|ARTCAFFE|CAFE|RESTAURANT|CHOMA|COFFEE|BAKERY|FOOD|GRILL/i.test(bodyUpper)) return 'food';
-    if (/MATATU|KENYATTA|UBER|BOLT|SUPER METRO|TRANS|BUS|FARE/i.test(bodyUpper)) return 'transport';
-    if (/KPLC|POWER|TOKENS|WATER|ELECTRIC/i.test(bodyUpper)) return 'utilities';
-    if (/SAFARICOM|AIRTIME|BUNDLE|DATA/i.test(bodyUpper)) return 'airtime';
-    if (/NAIVAS|CARREFOUR|QUICKMART|SUPERMARKET|MALL|MART|STORE/i.test(bodyUpper)) return 'shopping';
-    if (/RENT|LANDLORD|APARTMENT|HOUSING|ESTATE/i.test(bodyUpper)) return 'rent';
-    if (/SAVINGS|MSHWARI|KCB|LOCK/i.test(bodyUpper)) return 'savings';
+    // 2) Built-in merchant keywords — matched against the COUNTERPARTY ONLY.
+    //    v4 scanned the WHOLE SMS body: every send says "transferred", so the
+    //    loose tokens TRANS / KENYATTA / BUS pinned almost every person-to-person
+    //    payment to Transport. Word-boundary tokens from here on.
+    if (/JAVA|KFC|BURGER|PIZZA|ARTCAFFE|\bCAFE\b|RESTAURANT|CHOMA|COFFEE|BAKERY|GRILL|EATERY/i.test(cpUpper)) return 'food';
+    if (/MATATU|UBER|BOLT|SUPER METRO|\bFARE\b|\bTAXI\b|\bBODA\b|SHELL|RUBIS|\bTOTAL\b|\bFUEL\b|\bPETROL\b/i.test(cpUpper)) return 'transport';
+    if (/KPLC|\bPOWER\b|TOKENS|\bWATER\b|ELECTRIC|DSTV|GOTV|ZUKU|\bWIFI\b|\bINTERNET\b/i.test(cpUpper)) return 'utilities';
+    if (/SAFARICOM|AIRTIME|\bBUNDLE\b|\bCHARGES?\b/i.test(cpUpper)) return 'airtime';
+    if (/NAIVAS|CARREFOUR|QUICKMART|SUPERMARKET|\bMALL\b|\bMART\b|\bSTORE\b|\bMARKET\b/i.test(cpUpper)) return 'shopping';
+    if (/\bRENT\b|LANDLORD|APARTMENT|HOUSING|\bESTATE\b/i.test(cpUpper)) return 'rent';
+    if (/SAVINGS|MSHWARI|\bKCB\b|\bLOCK\b|\bCHAMA\b/i.test(cpUpper)) return 'savings';
 
-    return 'shopping';
+    // 3) Never blind-guess: unknown merchants and ALL person-to-person
+    //    payments land in Needs review — tap any row to set it, and the
+    //    app learns that counterparty for next time.
+    return 'needs_review';
+  }
+
+  // v5.3 one-time migration: undo the Transport bias baked into rows the old
+  // body-scanning regex mis-binned (person-shaped rows only, nothing else).
+  function migrateLegacyTransportBias() {
+    try {
+      if (localStorage.getItem('mpesa_tracker_mig_v53')) return 0;
+      let changed = 0;
+      db.forEach(t => {
+        if (t.category !== 'transport' || !isPersonName(t.counterparty)) return;
+        if (guessCategory(t.counterparty, '') !== 'needs_review') return;
+        t.category = 'needs_review';
+        changed++;
+      });
+      localStorage.setItem('mpesa_tracker_mig_v53', '1');
+      if (changed) saveDatabase();
+      return changed;
+    } catch (_) { return 0; }
   }
 
   function updateCategoryForTransaction(code, newCat) {
@@ -303,9 +393,14 @@
     tx.category = newCat;
     saveDatabase();
 
-    // Remember choice for this counterparty for future messages
+    // Remember choice for this counterparty for future messages.
+    // People (multi-word names) are remembered by FULL name so one
+    // person's rule never bleeds onto every namesake.
     if (tx.counterparty && tx.counterparty !== 'M-PESA Merchant') {
-      const keyword = tx.counterparty.split(' ')[0].toUpperCase();
+      const trimmed = tx.counterparty.trim();
+      const keyword = (trimmed.split(/\s+/).length >= 2 && !/\d/.test(trimmed))
+        ? trimmed.toUpperCase()
+        : trimmed.split(/\s+/)[0].toUpperCase();
       if (keyword.length >= 3) {
         userCategoryRules[keyword] = newCat;
         saveRules();
@@ -337,6 +432,13 @@
     return null;
   }
 
+  function getExportPlugin() {
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ExportPlugin) {
+      return window.Capacitor.Plugins.ExportPlugin;
+    }
+    return null;
+  }
+
   async function checkNativeSmsPermissions() {
     const plugin = getSmsPlugin();
     if (!plugin) return { available: false, granted: false };
@@ -359,30 +461,103 @@
     }
   }
 
-  async function scanMpesaInbox() {
+  // ---- First-run full-history import overlay (floats above everything) ----
+  let importOverlayOn = false;
+  function showImportOverlay() {
+    const el = document.getElementById('importProgress');
+    if (!el) return;
+    importOverlayOn = true;
+    el.classList.add('is-open');
+    updateImportOverlay(0, 0);
+  }
+  function updateImportOverlay(found, pages) {
+    if (!importOverlayOn) return;
+    const countEl = document.getElementById('importProgressCount');
+    const fillEl = document.getElementById('importProgressFill');
+    if (countEl) countEl.textContent = found > 0
+      ? `${formatKsh(found)} transaction${found === 1 ? '' : 's'} found so far\u2026`
+      : 'Scanning your inbox\u2026';
+    // History length is unknown upfront — the bar advances smoothly toward
+    // 90% as pages stream in and snaps to 100% when the scan completes.
+    if (fillEl) fillEl.style.width = Math.min(90, 6 + pages * 7) + '%';
+  }
+  function finishImportOverlay() {
+    if (!importOverlayOn) return;
+    const fillEl = document.getElementById('importProgressFill');
+    if (fillEl) fillEl.style.width = '100%';
+    setTimeout(() => {
+      importOverlayOn = false;
+      const el = document.getElementById('importProgress');
+      if (el) el.classList.remove('is-open');
+    }, 400);
+  }
+
+  // opts.deep=false  -> newest-page only (fast path, used at startup)
+  // opts.deep=true   -> walk offset pages of the WHOLE inbox, back to the
+  //                     very first M-PESA message ever received (v5.0)
+  // opts.onProgress -> optional (importedCount, pagesRead) progress hook
+  async function scanMpesaInbox(opts) {
     const plugin = getSmsPlugin();
-    if (!plugin) return 0;
+    if (!plugin || inboxScanInProgress) return 0;
+    inboxScanInProgress = true;
+    const deep = !!(opts && opts.deep);
+    const onProgress = (opts && typeof opts.onProgress === 'function') ? opts.onProgress : null;
+    // First full population of the ledger -> floating progress card that
+    // openly says this happens on first setup only (v5.4).
+    const firstLoad = deep && db.length === 0;
+    if (firstLoad) showImportOverlay();
+    const progress = firstLoad
+      ? (n, p) => { updateImportOverlay(n, p); if (onProgress) onProgress(n, p); }
+      : onProgress;
+    const PAGE = 350;
+    let imported = 0;
     try {
-      const res = await plugin.readMpesaInbox({ limit: 500 });
-      if (res && res.messages && Array.isArray(res.messages)) {
-        let imported = 0;
-        res.messages.forEach(msg => {
-          const parsed = parseMpesaMessage(msg.body, msg.timestamp);
-          if (parsed) {
-            if (insertTransaction(parsed)) {
-              imported++;
+      if (!deep) {
+        const res = await plugin.readMpesaInbox({ limit: 500, offset: 0 });
+        if (res && Array.isArray(res.messages)) {
+          const batch = [];
+          for (const msg of res.messages) {
+            const parsed = parseMpesaMessage(msg.body, msg.timestamp);
+            if (parsed) batch.push(parsed);
+          }
+          imported = insertManyTransactions(batch);
+        }
+      } else {
+        // The native layer sorts the whole SMS table newest-first; hasMore
+        // stays true while a page was completely full — i.e. history goes on.
+        // Parse + persist in bounded batches with micro-yields so the UI
+        // thread keeps breathing while history streams in.
+        for (let offset = 0, guard = 0; guard < 300; guard++, offset += PAGE) {
+          const res = await plugin.readMpesaInbox({ limit: PAGE, offset });
+          if (!res || !Array.isArray(res.messages)) break;
+          const batch = [];
+          for (const msg of res.messages) {
+            const parsed = parseMpesaMessage(msg.body, msg.timestamp);
+            if (parsed) batch.push(parsed);
+            if (batch.length >= 150) {
+              imported += insertManyTransactions(batch.splice(0, batch.length));
+              if (progress) progress(imported, guard + 1);
+              await new Promise(r => setTimeout(r, 0));
             }
           }
-        });
-        return imported;
+          if (batch.length) imported += insertManyTransactions(batch);
+          if (progress) progress(imported, guard + 1);
+          if (!res.hasMore) break; // reached the oldest SMS in the inbox
+          await new Promise(r => setTimeout(r, 0));
+        }
       }
+      return imported;
     } catch (e) {
       // Never write message content to logs
+      return imported;
+    } finally {
+      inboxScanInProgress = false;
+      if (firstLoad) finishImportOverlay();
     }
-    return 0;
   }
 
   function listenForLiveSms() {
+    if (liveSmsListenerAttached) return;
     const plugin = getSmsPlugin();
     if (!plugin || !plugin.addListener) return;
     try {
@@ -392,28 +567,85 @@
           if (parsed) {
             const added = insertTransaction(parsed);
             if (added) {
-              renderAllViews();
+              renderActiveView();
               showToast(`New M-PESA: ${parsed.type === 'received' ? '+' : '−'}KSh ${formatKsh(parsed.amount)} (${parsed.counterparty})`);
             }
           }
         }
       });
+      liveSmsListenerAttached = true;
     } catch (_) {}
+  }
+
+  // Silent startup sync: import anything received while the app was closed
+  async function autoSyncOnStartup() {
+    const count = await scanMpesaInbox();
+    if (count > 0) {
+      renderAllViews();
+      showToast(`Synced ${count} new M-PESA transaction${count === 1 ? '' : 's'} from your inbox.`);
+    }
   }
 
   // ========================================================
   // UI RENDERING ENGINE
   // ========================================================
+  const VIEW_RENDERERS = {
+    'view-dashboard': renderDashboard,
+    'view-analytics': renderAnalytics,
+    'view-categories': renderCategoriesGrid,
+    'view-transactions': renderTransactions
+  };
+  const dirtyViews = new Set();
+
   function renderAllViews() {
     renderDashboard();
     renderAnalytics();
     renderCategoriesGrid();
+    renderTransactions();
+    dirtyViews.clear();
   }
 
-  function renderDashboard() {
+  // Light refresh for inline edits (recategorize etc.): only the VISIBLE
+  // view rebuilds now; the rest rebuild on first visit. The v4.4-era
+  // renderAllViews-here is what made every category edit jank (v5.4).
+  function renderActiveView() {
+    Object.keys(VIEW_RENDERERS).forEach(id => dirtyViews.add(id));
+    const r = VIEW_RENDERERS[activeTabId];
+    if (r) {
+      r();
+      dirtyViews.delete(activeTabId);
+    }
+  }
+
+  // Shared transaction row — used by Dashboard and the All Transactions screen,
+  // so edits made on either screen stay in sync (both render from the same db).
+  function buildTxRow(tx) {
+    const cat = CATEGORIES[tx.category] || CATEGORIES.misc;
+    const isIn = tx.type === 'received';
+    const sign = isIn ? '+' : '−';
+    const amtClass = isIn ? 'tx-amount--in' : 'tx-amount--out';
+
+    const li = document.createElement('li');
+    li.className = 'tx';
+    li.innerHTML = `
+      <div class="tx-icon ${cat.class}">
+        ${icon(cat.icon)}
+      </div>
+      <div class="tx-body">
+        <p class="tx-title">${escapeHtml(tx.counterparty)}</p>
+        <p class="tx-meta">${escapeHtml(cat.name)} · ${escapeHtml(tx.datetime || '')}</p>
+      </div>
+      <div class="tx-amount ${amtClass}">${sign} KSh ${formatKsh(tx.amount)}</div>
+    `;
+
+    // Tap any row -> change category popup (same dialog on every screen)
+    li.addEventListener('click', () => openCategoryPicker(tx));
+    return li;
+  }
+
+  function totals() {
     let totalExpense = 0;
     let totalIncome = 0;
-
     db.forEach(t => {
       if (t.type === 'received') {
         totalIncome += Number(t.amount || 0);
@@ -421,15 +653,46 @@
         totalExpense += Number(t.amount || 0);
       }
     });
+    return { totalExpense, totalIncome, net: totalIncome - totalExpense };
+  }
 
-    const net = totalIncome - totalExpense;
+  // v5.3: dashboard headline numbers are THIS MONTH ONLY. Deep history
+  // still lives in All Transactions, CSV exports and AI features.
+  function monthTotals() {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    let totalExpense = 0;
+    let totalIncome = 0;
+    db.forEach(t => {
+      if (Number(t.timestamp || 0) < start) return;
+      if (t.type === 'received') {
+        totalIncome += Number(t.amount || 0);
+      } else {
+        totalExpense += Number(t.amount || 0);
+      }
+    });
+    return { totalExpense, totalIncome, net: totalIncome - totalExpense };
+  }
+
+  function renderDashboard() {
+    const { totalExpense, totalIncome, net } = monthTotals();
 
     // Balance Card
     const totalSpentEl = document.getElementById('dashTotalSpent');
     if (totalSpentEl) totalSpentEl.innerHTML = `KSh <span>${formatKsh(totalExpense)}</span>`;
 
+    const monthName = new Date().toLocaleDateString('en-GB', { month: 'long' });
+    const monthLabel = document.getElementById('dashMonthLabel');
+    if (monthLabel) monthLabel.textContent = `Total spent · ${monthName}`;
+
     const netEl = document.getElementById('dashNetTotal');
     if (netEl) netEl.textContent = `Net: ${net >= 0 ? '+' : '−'}KSh ${formatKsh(Math.abs(net))}`;
+
+    // Trend chip: this month vs last month (only shown with real data)
+    renderTrendChip();
+
+    // Weekly bars from real daily expenses (last 7 days)
+    renderWeeklyBars();
 
     // Mini Stats
     const miniIncome = document.getElementById('miniIncome');
@@ -439,59 +702,137 @@
     if (miniExpenses) miniExpenses.textContent = `−KSh ${formatKsh(totalExpense)}`;
 
     const miniCount = document.getElementById('miniCount');
-    if (miniCount) miniCount.textContent = `${db.length} items`;
+    if (miniCount) miniCount.textContent = `${db.length} item${db.length === 1 ? '' : 's'}`;
 
-    // Transaction List
+    // Transaction List (recent, newest first — unchanged behavior)
     const listEl = document.getElementById('dashboardTxList');
     if (!listEl) return;
     listEl.innerHTML = '';
 
     const recents = db.slice(0, 15);
     if (!recents.length) {
-      listEl.innerHTML = '<li class="empty-state">No M-PESA transactions found. Scan your inbox or paste an SMS.</li>';
+      listEl.innerHTML = '<li class="empty-state">No M-PESA transactions yet. Grant SMS access to start tracking.</li>';
       return;
     }
 
-    recents.forEach(tx => {
-      const cat = CATEGORIES[tx.category] || CATEGORIES.shopping;
-      const isIn = tx.type === 'received';
-      const sign = isIn ? '+' : '−';
-      const amtClass = isIn ? 'tx-amount--in' : 'tx-amount--out';
+    recents.forEach(tx => listEl.appendChild(buildTxRow(tx)));
+  }
 
-      const li = document.createElement('li');
-      li.className = 'tx';
-      li.innerHTML = `
-        <div class="tx-icon ${cat.class}">
-          <span class="material-icons-round">${cat.icon}</span>
-        </div>
-        <div class="tx-body">
-          <p class="tx-title">${escapeHtml(tx.counterparty)}</p>
-          <p class="tx-meta">${escapeHtml(cat.name)} · ${escapeHtml(tx.datetime || '')}</p>
-        </div>
-        <div class="tx-amount ${amtClass}">${sign} KSh ${formatKsh(tx.amount)}</div>
-      `;
+  function renderTrendChip() {
+    const trendEl = document.getElementById('dashTrend');
+    if (!trendEl) return;
 
-      // Allow tap to change category
-      li.addEventListener('click', () => openCategoryPicker(tx));
-      listEl.appendChild(li);
+    const now = new Date();
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+
+    let thisMonth = 0;
+    let lastMonth = 0;
+    db.forEach(t => {
+      if (t.type === 'received') return;
+      const ts = Number(t.timestamp || 0);
+      const amt = Number(t.amount || 0);
+      if (ts >= thisMonthStart) thisMonth += amt;
+      else if (ts >= lastMonthStart) lastMonth += amt;
     });
+
+    // Hide in a zero-mock state (nothing to compare yet)
+    if (thisMonth === 0 && lastMonth === 0) {
+      trendEl.style.display = 'none';
+      return;
+    }
+
+    const lastMonthName = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      .toLocaleDateString('en-GB', { month: 'short' });
+
+    let chip;
+    if (lastMonth === 0) {
+      chip = `${icon('trending_up', 'ic-xs')}<span>new this month</span>`;
+    } else {
+      const pct = Math.round(((thisMonth - lastMonth) / lastMonth) * 100);
+      const up = pct >= 0;
+      chip = `${icon(up ? 'trending_up' : 'trending_down', 'ic-xs')}<span>${up ? '+' : ''}${pct}% vs ${lastMonthName}</span>`;
+    }
+    trendEl.innerHTML = chip;
+    trendEl.style.display = 'inline-flex';
+  }
+
+  function renderWeeklyBars() {
+    const barsEl = document.getElementById('weeklyBars');
+    const readoutEl = document.getElementById('weeklyReadout');
+    if (!barsEl) return;
+
+    // Build the last 7 days ending today
+    const days = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      days.push({
+        key: `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`,
+        dow: d.toLocaleDateString('en-GB', { weekday: 'short' }),
+        label: d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' }),
+        start: d.getTime(),
+        end: d.getTime() + 86400000,
+        total: 0
+      });
+    }
+
+    db.forEach(t => {
+      if (t.type === 'received') return;
+      const ts = Number(t.timestamp || 0);
+      const amt = Number(t.amount || 0);
+      for (const day of days) {
+        if (ts >= day.start && ts < day.end) {
+          day.total += amt;
+          break;
+        }
+      }
+    });
+
+    // Keep the tapped day selected across re-renders; default = today
+    if (!selectedWeekDayKey || !days.some(d => d.key === selectedWeekDayKey)) {
+      selectedWeekDayKey = days[days.length - 1].key;
+    }
+
+    const maxTotal = Math.max(...days.map(d => d.total), 0);
+    barsEl.innerHTML = '';
+    days.forEach(day => {
+      const col = document.createElement('button');
+      col.type = 'button';
+      col.className = 'week-col' + (day.key === selectedWeekDayKey ? ' is-selected' : '');
+      const pct = maxTotal === 0 ? 6 : Math.max(6, Math.round((day.total / maxTotal) * 100));
+      col.innerHTML = `<span class="week-bar" style="--h:${pct}%"></span><span class="week-day">${escapeHtml(day.dow)}</span>`;
+      col.setAttribute('aria-label', `${day.label}: KSh ${formatKsh(day.total)}`);
+      col.addEventListener('click', () => {
+        selectedWeekDayKey = day.key;
+        renderWeeklyBars();
+      });
+      barsEl.appendChild(col);
+    });
+
+    const sel = days.find(d => d.key === selectedWeekDayKey);
+    if (readoutEl && sel) {
+      readoutEl.textContent = sel.total > 0
+        ? `${sel.label} · KSh ${formatKsh(sel.total)} spent`
+        : `${sel.label} · no spend recorded`;
+    }
   }
 
   function renderAnalytics() {
-    let totalExpense = 0;
-    let totalIncome = 0;
+    const { totalExpense, totalIncome, net } = monthTotals();
     const catTotals = {};
 
+    const now = new Date();
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
     db.forEach(t => {
-      if (t.type === 'received') {
-        totalIncome += Number(t.amount || 0);
-      } else {
-        totalExpense += Number(t.amount || 0);
+      if (t.type !== 'received' && Number(t.timestamp || 0) >= thisMonthStart) {
         catTotals[t.category] = (catTotals[t.category] || 0) + Number(t.amount || 0);
       }
     });
 
-    const net = totalIncome - totalExpense;
+    const monthName = new Date().toLocaleDateString('en-GB', { month: 'long' });
+    const analyticsMonthLabel = document.getElementById('analyticsMonthLabel');
+    if (analyticsMonthLabel) analyticsMonthLabel.textContent = `${monthName} breakdown`;
 
     const totalEl = document.getElementById('analyticsTotal');
     if (totalEl) totalEl.textContent = `KSh ${formatKsh(totalExpense)}`;
@@ -513,7 +854,7 @@
     const maxVal = entries.length ? Math.max(...entries.map(e => e[1])) : 1;
 
     entries.forEach(([catKey, total]) => {
-      const cat = CATEGORIES[catKey] || CATEGORIES.shopping;
+      const cat = CATEGORIES[catKey] || CATEGORIES.misc;
       const percent = Math.min(100, Math.round((total / maxVal) * 100));
 
       const row = document.createElement('div');
@@ -521,7 +862,7 @@
       row.innerHTML = `
         <div class="cat-bar-header">
           <span class="cat-bar-name">
-            <span class="tx-icon ${cat.class} cat-bar-badge"><span class="material-icons-round">${cat.icon}</span></span>
+            <span class="tx-icon ${cat.class} cat-bar-badge">${icon(cat.icon, 'ic-xs')}</span>
             ${escapeHtml(cat.name)}
           </span>
           <strong class="cat-bar-amount">KSh ${formatKsh(total)}</strong>
@@ -551,15 +892,127 @@
       const count = items.length;
       const sum = items.reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
+      // v5.3: every category card is interactive — tap to expand its items,
+      // tap any row inside to recategorize it (same picker as everywhere).
       const card = document.createElement('div');
       card.className = 'category-card';
+      card.setAttribute('role', 'button');
+      if (openCategoryKey === key) card.classList.add('is-open');
       card.innerHTML = `
-        <div class="tx-icon ${c.class}"><span class="material-icons-round">${c.icon}</span></div>
+        <div class="tx-icon ${c.class}">${icon(c.icon)}</div>
         <h4>${escapeHtml(c.name)}</h4>
         <p class="category-meta">${count} item${count === 1 ? '' : 's'}</p>
         <p class="category-total">KSh ${formatKsh(sum)}</p>
+        <p class="category-hint">${count ? 'Tap to review' : 'No items yet'}</p>
       `;
+
+      if (count) {
+        const bodyEl = document.createElement('div');
+        bodyEl.className = 'category-card-items';
+        const ul = document.createElement('ul');
+        ul.className = 'tx-list tx-list--plain';
+        items.slice(0, 40).forEach(tx => ul.appendChild(buildTxRow(tx)));
+        bodyEl.appendChild(ul);
+        if (count > 40) {
+          const more = document.createElement('p');
+          more.className = 'category-meta category-more';
+          more.textContent = `\u2026and ${count - 40} more (see All Transactions)`;
+          bodyEl.appendChild(more);
+        }
+        card.appendChild(bodyEl);
+
+        card.addEventListener('click', e => {
+          // Row taps open the picker via buildTxRow; bare card taps toggle
+          if (e.target.closest('.tx')) return;
+          const opening = !card.classList.contains('is-open');
+          card.classList.toggle('is-open', opening);
+          openCategoryKey = opening ? key : null;
+        });
+      }
       grid.appendChild(card);
+    });
+  }
+
+  // ========================================================
+  // ALL TRANSACTIONS SCREEN — accordion grouped by month & year
+  // ========================================================
+  function renderTransactions() {
+    const host = document.getElementById('transactionsGroups');
+    if (!host) return;
+    host.innerHTML = '';
+
+    if (!db.length) {
+      host.innerHTML = '<div class="empty-state empty-state--card">No transactions yet. Sync your SMS inbox from Settings, or paste an SMS below.</div>';
+      return;
+    }
+
+    // Group chronologically by Year-Month
+    const groups = new Map();
+    db.forEach(t => {
+      const d = new Date(Number(t.timestamp || Date.now()));
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key,
+          label: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+          items: [],
+          spend: 0,
+          count: 0
+        });
+      }
+      const g = groups.get(key);
+      g.items.push(t);
+      g.count++;
+      if (t.type !== 'received') g.spend += Number(t.amount || 0);
+    });
+
+    const sortedKeys = [...groups.keys()].sort().reverse(); // newest month first
+
+    sortedKeys.forEach((key, idx) => {
+      const g = groups.get(key);
+      // Default: only the latest month expanded; choice remembered across renders
+      const collapsed = (key in txGroupState) ? txGroupState[key] : (idx !== 0);
+
+      const wrap = document.createElement('div');
+      wrap.className = 'tx-group' + (collapsed ? ' is-collapsed' : '');
+
+      const header = document.createElement('button');
+      header.type = 'button';
+      header.className = 'tx-group-header';
+      header.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      header.innerHTML = `
+        <span class="tx-group-title">${escapeHtml(g.label)}</span>
+        <span class="tx-group-meta" data-month-total>−KSh ${formatKsh(g.spend)} · ${g.count} item${g.count === 1 ? '' : 's'}</span>
+        <svg class="ic ic-sm tx-group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      `;
+      const body = document.createElement('div');
+      body.className = 'tx-group-body';
+
+      // v5.4 lazy bodies: collapsed months carry NO row DOM at all. With
+      // years of history, building every group's rows up front was the lag
+      // behind tab switches, picker edits and post-sync renders.
+      const fillBody = () => {
+        if (body.dataset.filled) return;
+        const ul = document.createElement('ul');
+        ul.className = 'tx-list tx-list--plain';
+        g.items.forEach(tx => ul.appendChild(buildTxRow(tx)));
+        body.appendChild(ul);
+        body.dataset.filled = '1';
+      };
+
+      header.addEventListener('click', () => {
+        const nowCollapsed = !wrap.classList.contains('is-collapsed');
+        txGroupState[key] = nowCollapsed;
+        if (!nowCollapsed) fillBody();
+        wrap.classList.toggle('is-collapsed', nowCollapsed);
+        header.setAttribute('aria-expanded', String(!nowCollapsed));
+      });
+
+      if (!collapsed) fillBody();
+
+      wrap.appendChild(header);
+      wrap.appendChild(body);
+      host.appendChild(wrap);
     });
   }
 
@@ -577,14 +1030,16 @@
       const btn = document.createElement('button');
       btn.className = `cat-option-btn ${tx.category === c.key ? 'is-selected' : ''}`;
       btn.innerHTML = `
-        <span class="tx-icon ${c.class} cat-bar-badge"><span class="material-icons-round">${c.icon}</span></span>
+        <span class="tx-icon ${c.class} cat-bar-badge">${icon(c.icon, 'ic-xs')}</span>
         <span>${escapeHtml(c.name)}</span>
       `;
       btn.addEventListener('click', () => {
         updateCategoryForTransaction(tx.code, c.key);
+        // Acknowledge the tap INSTANTLY (modal closes + toast paints),
+        // then re-render just the visible view on the next frame (v5.4).
         modal.classList.remove('is-open');
-        renderAllViews();
         showToast(`Category updated to ${c.name}`);
+        requestAnimationFrame(() => { renderActiveView(); });
       });
       optionsEl.appendChild(btn);
     });
@@ -593,20 +1048,19 @@
   }
 
   // ========================================================
-  // PERMISSION MODAL & ONBOARDING
+  // PERMISSION MODAL & FIRST-RUN ONBOARDING
   // ========================================================
   function initPermissionScreen() {
     const banner = document.getElementById('permBanner');
     const modal = document.getElementById('permModal');
     const grantBtn = document.getElementById('grantPermBtn');
-    const scanBtn = document.getElementById('scanInboxBtn');
     const bannerScanBtn = document.getElementById('bannerScanBtn');
     const bannerDismissBtn = document.getElementById('bannerDismissBtn');
     const modalCloseBtn = document.getElementById('permModalClose');
 
     const plugin = getSmsPlugin();
 
-    // Check permissions and show friendly prompt
+    // Check permissions and show the first-run popup
     async function checkAndPrompt() {
       if (!plugin) {
         if (banner) banner.style.display = 'none';
@@ -617,6 +1071,7 @@
       if (!status.granted) {
         const dismissed = localStorage.getItem(STORAGE_KEY_PERM_DISMISSED);
         if (!dismissed && modal) {
+          // First run: ask up-front for SMS access
           modal.classList.add('is-open');
         } else if (banner) {
           banner.style.display = 'flex';
@@ -625,6 +1080,7 @@
         if (banner) banner.style.display = 'none';
         if (modal) modal.classList.remove('is-open');
         listenForLiveSms();
+        autoSyncOnStartup();
       }
     }
 
@@ -633,13 +1089,15 @@
         if (modal) modal.classList.remove('is-open');
         const granted = await requestNativeSmsPermissions();
         if (granted) {
-          showToast('SMS permission granted. Scanning M-PESA messages...');
+          showToast('SMS permission granted. Deep scanning your full inbox…');
           listenForLiveSms();
-          const count = await scanMpesaInbox();
+          const count = await scanMpesaInbox({ deep: true });
           renderAllViews();
-          showToast(`Imported ${count} M-PESA transactions`);
+          showToast(count > 0
+            ? `Imported ${count} M-PESA transaction${count === 1 ? '' : 's'} — full history restored.`
+            : 'No M-PESA messages found in this inbox yet.');
         } else {
-          showToast('Permission not granted. You can still paste SMS messages manually.');
+          showToast('Permission not granted. You can enable SMS access anytime from Settings.');
           if (banner) banner.style.display = 'flex';
         }
       });
@@ -666,87 +1124,57 @@
       });
     }
 
-    if (scanBtn) {
-      scanBtn.addEventListener('click', async () => {
-        if (!plugin) {
-          showToast('SMS reading is available inside the Android APK.');
-          return;
-        }
-        const status = await checkNativeSmsPermissions();
-        if (!status.granted) {
-          if (modal) modal.classList.add('is-open');
-          return;
-        }
-        showToast('Scanning inbox for M-PESA messages...');
-        const count = await scanMpesaInbox();
-        renderAllViews();
-        showToast(`Scan complete: ${count} new M-PESA transactions imported.`);
-      });
-    }
-
     checkAndPrompt();
   }
 
   // ========================================================
-  // PARSE MANUAL SMS TAB
+  // SETTINGS: SYNC SMS INBOX TOOL
   // ========================================================
-  function initSmsTab() {
-    const parseBtn = document.getElementById('parseSmsBtn');
-    const inputEl = document.getElementById('smsInputText');
-    const sample1Btn = document.getElementById('sample1Btn');
-    const sample2Btn = document.getElementById('sample2Btn');
-    const sample3Btn = document.getElementById('sample3Btn');
+  function initInboxSync() {
+    const syncBtn = document.getElementById('syncInboxBtn');
+    const syncLabel = document.getElementById('syncInboxLabel');
+    const syncIcon = document.getElementById('syncInboxIcon');
+    const modal = document.getElementById('permModal');
+    if (!syncBtn) return;
 
-    if (sample1Btn && inputEl) {
-      sample1Btn.addEventListener('click', () => {
-        inputEl.value = 'UHK1A2B3C4 Confirmed. Ksh500.00 sent to JOHN DOE 0712345678 on 20/9/26 at 11:50 AM. New M-PESA balance is Ksh2,000.00. Transaction cost, Ksh7.00.';
-        inputEl.focus();
-      });
-    }
+    syncBtn.addEventListener('click', async () => {
+      const plugin = getSmsPlugin();
+      if (!plugin) {
+        showToast('Inbox sync works inside the Android APK.');
+        return;
+      }
 
-    if (sample2Btn && inputEl) {
-      sample2Btn.addEventListener('click', () => {
-        inputEl.value = 'UHK1A2B3C4 Confirmed. Ksh850.00 paid to JAVA HOUSE. on 20/9/26 at 12:42 PM.';
-        inputEl.focus();
-      });
-    }
-
-    if (sample3Btn && inputEl) {
-      sample3Btn.addEventListener('click', () => {
-        inputEl.value = 'UHK1A2B3C4 Confirmed. You have received Ksh2,000.00 from JANE DOE 0722000000 on 20/9/26 at 9:01 AM.';
-        inputEl.focus();
-      });
-    }
-
-    if (parseBtn && inputEl) {
-      parseBtn.addEventListener('click', () => {
-        const text = inputEl.value.trim();
-        if (!text) {
-          showToast('Please paste an M-PESA SMS text first.');
-          return;
-        }
-
-        const parsed = parseMpesaMessage(text, Date.now());
-        if (!parsed) {
-          showToast('Could not find 10-character transaction code. Please check SMS.');
-          return;
-        }
-
-        const added = insertTransaction(parsed);
-        renderAllViews();
-        inputEl.value = '';
-
-        if (added) {
-          showToast(`Saved: ${parsed.type === 'received' ? '+' : '−'}KSh ${formatKsh(parsed.amount)} (${parsed.counterparty})`);
+      const status = await checkNativeSmsPermissions();
+      if (!status.granted) {
+        if (modal) {
+          modal.classList.add('is-open');
         } else {
-          showToast(`Transaction ${parsed.code} was already in your database (no duplicate added).`);
+          showToast('Grant SMS permission first.');
         }
+        return;
+      }
 
-        // Switch to dashboard
-        const dashBtn = document.querySelector('[data-tab="view-dashboard"]');
-        if (dashBtn) dashBtn.click();
-      });
-    }
+      // Busy state + live progress while the deep scan walks the inbox
+      syncBtn.disabled = true;
+      if (syncLabel) syncLabel.textContent = 'Deep scanning…';
+      // No spinning icons (house rule) — the live "N found" counter is the indicator.
+
+      try {
+        const count = await scanMpesaInbox({
+          deep: true,
+          onProgress: n => { if (syncLabel) syncLabel.textContent = `Scanning… ${n} found`; }
+        });
+        renderAllViews();
+        if (count > 0) {
+          showToast(`Sync complete: ${count} new M-PESA transaction${count === 1 ? '' : 's'} imported.`);
+        } else {
+          showToast('Sync complete: ledger already up to date.');
+        }
+      } finally {
+        syncBtn.disabled = false;
+        if (syncLabel) syncLabel.textContent = 'Sync';
+      }
+    });
   }
 
   // ========================================================
@@ -754,50 +1182,61 @@
   // ========================================================
   function initTheme() {
     const html = document.documentElement;
+    const THEMES = ['light', 'dark', 'amoled'];
 
     function apply(theme) {
+      if (!THEMES.includes(theme)) theme = 'light';
       html.setAttribute('data-theme', theme);
-      const sw = document.getElementById('themeSwitch');
-      if (sw) sw.checked = theme === 'dark';
+      // Instant pivot — no palette tween (v4.4's cross-fade caused the
+      // "choppy and awful" theme switch by re-painting every glass blur).
+      document.querySelectorAll('.theme-seg-btn').forEach(btn => {
+        btn.classList.toggle('is-active', btn.getAttribute('data-theme') === theme);
+      });
     }
 
     let t = localStorage.getItem(STORAGE_KEY_THEME);
-    if (!t) {
+    if (!t || !THEMES.includes(t)) {
       t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
     }
     apply(t);
 
-    const toggleBtn = document.getElementById('themeToggle');
-    if (toggleBtn) {
-      toggleBtn.addEventListener('click', () => {
-        const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        apply(next);
-        localStorage.setItem(STORAGE_KEY_THEME, next);
-      });
-    }
-
-    const sw = document.getElementById('themeSwitch');
-    if (sw) {
-      sw.addEventListener('change', () => {
-        const next = sw.checked ? 'dark' : 'light';
-        apply(next);
-        localStorage.setItem(STORAGE_KEY_THEME, next);
+    // The header quick-toggle was removed in v5.0 — the Settings segmented
+    // control is the single source of truth.
+    const seg = document.getElementById('themeSeg');
+    if (seg) {
+      seg.querySelectorAll('.theme-seg-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const next = btn.getAttribute('data-theme');
+          if (!THEMES.includes(next)) return;
+          apply(next);
+          localStorage.setItem(STORAGE_KEY_THEME, next);
+        });
       });
     }
   }
 
+  function timeBasedGreeting() {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning,';
+    if (h < 17) return 'Good afternoon,';
+    return 'Good evening,';
+  }
+
   function initUser() {
-    const savedName = localStorage.getItem(STORAGE_KEY_USER) || 'Brian Otieno';
+    const savedName = localStorage.getItem(STORAGE_KEY_USER) || DEFAULT_USER_NAME;
     const nameEl = document.getElementById('userGreeting');
+    const helloEl = document.getElementById('helloLine');
     const avatarEl = document.getElementById('avatarBtn');
     const inputEl = document.getElementById('nameInput');
 
+    if (helloEl) helloEl.textContent = timeBasedGreeting();
+
     function updateName(name) {
-      const safe = name.trim() || 'Brian Otieno';
+      const safe = name.trim() || DEFAULT_USER_NAME;
       if (nameEl) nameEl.textContent = safe;
       if (inputEl) inputEl.value = safe;
-      const initials = safe.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'BO';
-      if (avatarEl) avatarEl.textContent = initials;
+      currentInitials = safe.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'MU';
+      renderAvatar(); // shows the stored photo if one exists, else initials
       localStorage.setItem(STORAGE_KEY_USER, safe);
     }
 
@@ -816,10 +1255,24 @@
     const views = document.querySelectorAll('.app-tab-view');
 
     function switchTab(targetId) {
+      // Remember where the user scrolled on the current tab…
+      tabScroll[activeTabId] = window.scrollY || document.documentElement.scrollTop || 0;
+
       items.forEach(btn => btn.classList.toggle('is-active', btn.getAttribute('data-tab') === targetId));
       views.forEach(v => v.classList.toggle('is-active', v.id === targetId));
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // …and restore it on return (new tabs start at the top)
+      window.scrollTo({ top: tabScroll[targetId] || 0, behavior: 'auto' });
+      activeTabId = targetId;
+
+      // First visit after data changed elsewhere -> rebuild just this view
+      if (dirtyViews.has(targetId)) {
+        const rr = VIEW_RENDERERS[targetId];
+        if (rr) rr();
+        dirtyViews.delete(targetId);
+      }
     }
+    window.__switchTab = switchTab; // used by in-page shortcuts
 
     items.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -828,47 +1281,133 @@
       });
     });
 
+    // "View all" on the dashboard routes to the All Transactions screen,
+    // auto-highlighting the Transactions dock tab
     const seeAll = document.getElementById('seeAllBtn');
-    if (seeAll) seeAll.addEventListener('click', () => switchTab('view-analytics'));
+    if (seeAll) seeAll.addEventListener('click', () => switchTab('view-transactions'));
+
+    // Back shortcut from All Transactions to Home
+    const backBtn = document.getElementById('transactionsBackBtn');
+    if (backBtn) backBtn.addEventListener('click', () => switchTab('view-dashboard'));
+  }
+
+  // ========================================================
+  // CSV EXPORT (native Storage Access Framework + browser fallback)
+  // ========================================================
+  function csvEscapeCell(v) {
+    const s = String(v === null || v === undefined || v === '' ? '-' : v);
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+
+  // Date & time are ALWAYS filled: parse the SMS "dd/mm/yy hh:mm AM" string,
+  // falling back to the message timestamp so no cell is ever empty.
+  function csvDateTime(t) {
+    const m = String(t.datetime || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})(?:\s*([AP]M))?/i);
+    const pad = n => String(n).padStart(2, '0');
+    if (m) {
+      let dd = m[1], mm = m[2], yy = m[3], hh = parseInt(m[4], 10);
+      const min = m[5], ap = (m[6] || '').toUpperCase();
+      if (ap === 'PM' && hh < 12) hh += 12;
+      if (ap === 'AM' && hh === 12) hh = 0;
+      if (yy.length === 2) yy = '20' + yy;
+      return { date: `${yy}-${pad(mm)}-${pad(dd)}`, time: `${pad(hh)}:${min}` };
+    }
+    const d = new Date(Number(t.timestamp || Date.now()));
+    return {
+      date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+      time: `${pad(d.getHours())}:${pad(d.getMinutes())}`
+    };
+  }
+
+  function buildCsvText() {
+    let csv = 'Code,Date,Time,Type,Category,Counterparty,Phone,Amount (KSh),Cost (KSh),Balance (KSh)\n';
+    db.forEach(t => {
+      const dt = csvDateTime(t);
+      const catName = (CATEGORIES[t.category] || {}).name || t.category || '-';
+      const amount = Number(t.amount || 0).toFixed(2);
+      const cost = (t.cost !== null && t.cost !== undefined) ? Number(t.cost).toFixed(2) : '-';
+      const balance = (t.balance !== null && t.balance !== undefined) ? Number(t.balance).toFixed(2) : '-';
+      csv += [
+        csvEscapeCell(t.code), csvEscapeCell(dt.date), csvEscapeCell(dt.time),
+        csvEscapeCell(t.type), csvEscapeCell(catName), csvEscapeCell(t.counterparty),
+        csvEscapeCell(t.phone), `"${amount}"`, `"${cost}"`, `"${balance}"`
+      ].join(',') + '\n';
+    });
+    return csv;
+  }
+
+  // Saves CSV: in the APK it pops the Android file manager (document picker)
+  // so the user chooses the folder; in a plain browser it downloads the blob.
+  async function saveCsvEverywhere(fileName, contents) {
+    const plugin = getExportPlugin();
+    if (plugin) {
+      try {
+        const perm = await plugin.requestStorageAccess();
+        if (!perm || !perm.granted) {
+          showToast('Storage permission denied — CSV was not saved.');
+          return false;
+        }
+      } catch (_) { /* storage permission not needed on this Android version */ }
+
+      try {
+        const res = await plugin.saveCsvToStorage({ fileName, contents });
+        if (res && res.saved) {
+          showToast(`Saved ${fileName} to the location you picked.`);
+          return true;
+        }
+        showToast('Save cancelled — no file written.');
+        return false;
+      } catch (e) {
+        showToast('Could not save the CSV file.');
+        return false;
+      }
+    }
+
+    // Browser fallback: classic blob download
+    try {
+      const blob = new Blob([contents], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`Downloaded ${fileName}.`);
+      return true;
+    } catch (e) {
+      showToast('Could not save the CSV file.');
+      return false;
+    }
+  }
+
+  function todaySlug() {
+    return new Date().toISOString().slice(0, 10);
   }
 
   function initSettingsActions() {
     const exportBtn = document.getElementById('exportCsvBtn');
     if (exportBtn) {
-      exportBtn.addEventListener('click', () => {
+      exportBtn.addEventListener('click', async () => {
         if (!db.length) {
-          showToast('No transactions to export.');
+          showToast('No transactions to export yet. Sync your SMS inbox first.');
           return;
         }
-
-        let csv = 'Code,Type,Category,Counterparty,Amount (KSh),Balance (KSh),Cost (KSh),Date\n';
-        db.forEach(t => {
-          csv += `"${t.code || ''}","${t.type || ''}","${t.category || ''}","${(t.counterparty || '').replace(/"/g, '""')}",${t.amount || 0},${t.balance !== null ? t.balance : ''},${t.cost !== null ? t.cost : ''},"${t.datetime || ''}"\n`;
-        });
-
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `mpesa-statement-${new Date().toISOString().slice(0, 10)}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showToast('CSV statement exported.');
+        await saveCsvEverywhere(`mpesa-ledger-${todaySlug()}.csv`, buildCsvText());
       });
     }
 
-    const resetBtn = document.getElementById('resetDataBtn');
-    if (resetBtn) {
-      resetBtn.addEventListener('click', () => {
-        if (confirm('Reset transactions to default sample state?')) {
-          db = [...SEED_TRANSACTIONS];
+    const clearBtn = document.getElementById('clearDataBtn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        if (confirm('Permanently delete all tracked transactions and learned category rules from this device?')) {
+          db = [];
           userCategoryRules = { ...DEFAULT_RULES };
           saveDatabase();
           saveRules();
           renderAllViews();
-          showToast('Demo data restored.');
+          showToast('All transaction data cleared.');
         }
       });
     }
@@ -878,6 +1417,717 @@
     if (modalClose && modal) {
       modalClose.addEventListener('click', () => modal.classList.remove('is-open'));
     }
+  }
+
+  // ========================================================
+  // GEMINI AI REPORT (optional — the app's only online feature)
+  // ========================================================
+  // --------------------------------------------------------
+  // AI CORE — guarded, fallible, never blocking local features
+  // --------------------------------------------------------
+  function isOnline() {
+    return typeof navigator === 'undefined' ? true : navigator.onLine !== false;
+  }
+
+  function getGeminiKey() {
+    return (localStorage.getItem(STORAGE_KEY_GEMINI) || '').trim();
+  }
+
+  // Feature flag: AI only runs when the user opted in with their own key
+  function isGeminiEnabled() {
+    return getGeminiKey().length > 0;
+  }
+
+  // Non-blocking badge next to the AI controls when connectivity drops
+  function updateAiOfflineBadge() {
+    const badge = document.getElementById('aiOfflineBadge');
+    if (badge) badge.classList.toggle('is-visible', !isOnline());
+  }
+
+  // Capture the precise HTTP failure body (never a fabricated cause)
+  async function readGeminiErrorBody(resp) {
+    let raw = '';
+    try { raw = await resp.text(); } catch (_) { /* noop */ }
+    let message = '';
+    try {
+      const parsed = JSON.parse(raw);
+      message = (parsed && parsed.error && parsed.error.message) ? parsed.error.message : '';
+    } catch (_) { /* not JSON */ }
+    if (!message) message = (raw || '').slice(0, 160);
+    return { status: resp.status, message, raw };
+  }
+
+  // One gateway for every Gemini call: dynamic model fallback on ANY
+  // retryable failure — retired (404), overloaded (5xx) or rate-limited
+  // (429) models roll seamlessly to a healthier one. v4's "only roll on
+  // 404" behaviour is what hard-failed every AI feature with HTTP 503.
+  async function callGemini(prompt, opts) {
+    // Offline-first guardrails: feature flag + connectivity check up front
+    if (!isGeminiEnabled()) return { ok: false, reason: 'no-key' };
+    if (!isOnline()) return { ok: false, reason: 'offline' };
+
+    const key = getGeminiKey();
+    const cfg = Object.assign({ temperature: 0.2, maxOutputTokens: 4096 }, opts || {});
+    let lastHttpError = null;
+    let sawQuota = false;
+
+    async function tryModel(model) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), cfg.timeout || GEMINI_TIMEOUT_MS);
+      try {
+        const resp = await fetch(
+          `${GEMINI_ENDPOINT}/${model}:generateContent?key=${encodeURIComponent(key)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: cfg.temperature, maxOutputTokens: cfg.maxOutputTokens }
+            })
+          }
+        );
+        clearTimeout(timer);
+
+        if (!resp.ok) {
+          const err = await readGeminiErrorBody(resp);
+          console.warn(`[Gemini] ${model} -> HTTP ${err.status}: ${err.message}`);
+          if (err.status === 400 || err.status === 403) return { ok: false, reason: 'bad-key', status: err.status };
+          if (err.status === 429) sawQuota = true;
+          if (err.status === 404 || err.status === 429 || err.status >= 500) {
+            lastHttpError = err;
+            return { ok: false, reason: 'roll' };
+          }
+          return { ok: false, reason: 'http', status: err.status, detail: err.message };
+        }
+
+        const data = await resp.json();
+        const parts = ((((data || {}).candidates || [])[0] || {}).content || {}).parts || [];
+        const text = (parts[0] && parts[0].text) ? String(parts[0].text).trim() : '';
+        if (!text) return { ok: false, reason: 'empty' };
+        return { ok: true, text, model };
+      } catch (e) {
+        clearTimeout(timer);
+        if (e && e.name === 'AbortError') return { ok: false, reason: 'timeout' };
+        return { ok: false, reason: 'network' };
+      }
+    }
+
+    for (const model of GEMINI_MODELS) {
+      const res = await tryModel(model);
+      if (res.reason !== 'roll') return res;
+    }
+
+    // Every model rolled off. Transient Google 503s usually clear within a
+    // second, so give the primary model one final shot before giving up.
+    if (lastHttpError && lastHttpError.status >= 500) {
+      await new Promise(r => setTimeout(r, 900));
+      const retry = await tryModel(GEMINI_MODELS[0]);
+      if (retry.reason !== 'roll') return retry;
+    }
+
+    if (lastHttpError) {
+      const reason = lastHttpError.status === 404 ? 'model-404'
+        : (sawQuota && lastHttpError.status === 429 ? 'quota' : 'http');
+      return { ok: false, reason, status: lastHttpError.status, detail: lastHttpError.message };
+    }
+    return { ok: false, reason: 'model-404', status: 404, detail: '' };
+  }
+
+  // Honest, specific failure toasts — never the misleading
+  // "check your internet connection" for an upstream 404.
+  function toastGeminiFailure(res) {
+    if (!res) return;
+    switch (res.reason) {
+      case 'no-key':  showToast('Add your Gemini API key first — AI features are optional.'); break;
+      case 'bad-key': showToast('Gemini rejected the API key — get a fresh one at aistudio.google.com'); break;
+      case 'quota':   showToast('Gemini quota exhausted — try again later.'); break;
+      default: {
+        const suffix = res.status ? ` (Google returned HTTP ${res.status})` : '';
+        showToast(`Gemini AI feature failed${suffix}. Local features remain unaffected.`);
+      }
+    }
+  }
+
+  // Compact, privacy-preserving snapshot shared by all AI features:
+  // date/type/category/counterparty/amount/fee — NEVER codes, phones or balances.
+  function aiSnapshot(rows, limit) {
+    return rows.slice(0, limit || 120).map(t => ({
+      d: t.datetime || '',
+      t: t.type || 'sent',
+      c: t.category || 'misc',
+      p: (t.counterparty || '').slice(0, 40),
+      a: Number(t.amount || 0),
+      f: Number(t.cost || 0)
+    }));
+  }
+
+  // COMPLETE statistical summary of the ENTIRE ledger, computed locally.
+  // v5.5 root cause: AI features only received the newest ~140 raw rows,
+  // so with history back to 2021 the model literally could not see older
+  // years — and then asserted "no transactions exist for 2024". These
+  // aggregates cover EVERY record (same privacy fields as aiSnapshot:
+  // date bucket, category, counterparty, amounts, fees — never codes,
+  // phones or balances), so any year/month/category question has ground
+  // truth behind it.
+  function aiLedgerSummary() {
+    const pad = n => String(n).padStart(2, '0');
+    const iso = ts => { const d = new Date(ts); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+    const ym = ts => { const d = new Date(ts); return d.getFullYear() + '-' + pad(d.getMonth() + 1); };
+    const monthly = new Map();
+    const yearly = new Map();
+    const catByYear = new Map();
+    const people = new Map();
+    let oldest = 0, newest = 0;
+    db.forEach(t => {
+      const ts = Number(t.timestamp || 0);
+      if (!ts) return;
+      if (!oldest || ts < oldest) oldest = ts;
+      if (ts > newest) newest = ts;
+      const d = new Date(ts);
+      const y = d.getFullYear();
+      const m = y + '-' + pad(d.getMonth() + 1);
+      const amt = Number(t.amount || 0);
+      const fee = Number(t.cost || 0);
+      const isIn = t.type === 'received';
+      const isFuliza = /fuliza/i.test(t.counterparty || '') || t.type === 'fee';
+      const bump = (map, key) => {
+        const o = map.get(key) || { s: 0, r: 0, f: 0, z: 0, n: 0 };
+        if (isIn) o.r += amt; else o.s += amt;
+        o.f += fee;
+        if (isFuliza) o.z += amt + fee;
+        o.n++;
+        map.set(key, o);
+      };
+      bump(monthly, m);
+      bump(yearly, y);
+      if (!isIn) {
+        const ck = y + '|' + (t.category || 'misc');
+        catByYear.set(ck, (catByYear.get(ck) || 0) + amt);
+      }
+      // Case-insensitive merge so "KEVIN MMBADI" and "Kevin Mmbadi" are one person
+      const name = (t.counterparty || 'Unknown').slice(0, 36);
+      const nameKey = name.toUpperCase();
+      const p = people.get(nameKey) || { disp: name, n: 0, s: 0, r: 0, first: ts, last: ts };
+      p.n++;
+      if (isIn) p.r += amt; else p.s += amt;
+      if (ts < p.first) p.first = ts;
+      if (ts > p.last) p.last = ts;
+      people.set(nameKey, p);
+    });
+    // v5.6: EVERY counterparty is indexed (not just a top-40). The v5.5 bug:
+    // "Total sent to Kevin Mmbadi" failed because he wasn't in the top 40.
+    // Compact tuples keep the prompt small even with hundreds of names.
+    const counterparties = [...people.values()]
+      .sort((a, b) => (b.s + b.r) - (a.s + a.r))
+      .slice(0, 400)
+      .map(p => [p.disp, p.s, p.r, p.n, iso(p.first), iso(p.last)]);
+    // Largest single expenses — pre-computed so "biggest expense" questions
+    // are exact instead of hallucinated from a row slice.
+    const sentRows = db.filter(t => t.type !== 'received');
+    const amountDesc = (a, b) => Number(b.amount || 0) - Number(a.amount || 0);
+    const nowYm = ym(Date.now());
+    const largestExpensesAllTime = sentRows.slice().sort(amountDesc).slice(0, 8)
+      .map(t => [(t.counterparty || '').slice(0, 36), Number(t.amount || 0), ym(Number(t.timestamp || 0))]);
+    const largestExpensesThisMonth = sentRows
+      .filter(t => ym(Number(t.timestamp || 0)) === nowYm)
+      .sort(amountDesc).slice(0, 8)
+      .map(t => [(t.counterparty || '').slice(0, 36), Number(t.amount || 0), iso(Number(t.timestamp || 0))]);
+    return {
+      coverage: {
+        from: oldest ? iso(oldest) : null,
+        to: newest ? iso(newest) : null,
+        transactions: db.length
+      },
+      byYear: [...yearly.entries()].sort().map(([y, o]) => ({ y, sent: o.s, received: o.r, fees: o.f, fuliza: o.z, count: o.n })),
+      byMonth: [...monthly.entries()].sort().map(([m, o]) => ({ m, sent: o.s, received: o.r, fees: o.f, fuliza: o.z })),
+      spendByCategoryYear: [...catByYear.entries()].sort().map(([k, total]) => { const [y, c] = k.split('|'); return { year: Number(y), category: c, total }; }),
+      counterpartyTupleFields: 'name,sentTotal,receivedTotal,txCount,firstDate,lastDate',
+      counterparties,
+      omittedCounterparties: Math.max(0, people.size - 400),
+      largestExpensesThisMonth,
+      largestExpensesAllTime
+    };
+  }
+
+  // --------------------------------------------------------
+  // AI STATEMENT CSV (Gemini)
+  // --------------------------------------------------------
+  function initAiExport() {
+    const keyInput = document.getElementById('geminiKeyInput');
+    const aiBtn = document.getElementById('exportAiBtn');
+    const aiLabel = document.getElementById('exportAiLabel');
+
+    if (keyInput) {
+      keyInput.value = localStorage.getItem(STORAGE_KEY_GEMINI) || '';
+      keyInput.addEventListener('change', () => {
+        localStorage.setItem(STORAGE_KEY_GEMINI, keyInput.value.trim());
+        showToast(keyInput.value.trim() ? 'Gemini API key saved on this device.' : 'Gemini API key removed.');
+      });
+    }
+
+    if (!aiBtn) return;
+
+    aiBtn.addEventListener('click', async () => {
+      if (!isGeminiEnabled()) {
+        toastGeminiFailure({ reason: 'no-key' });
+        if (keyInput) keyInput.focus();
+        return;
+      }
+      if (!db.length) {
+        showToast('No transactions to analyze yet. Sync your SMS inbox first.');
+        return;
+      }
+      if (!isOnline()) {
+        toastGeminiFailure({ reason: 'offline' });
+        return;
+      }
+
+      const prompt =
+        'You are a personal-finance CSV generator. You receive (A) COMPLETE pre-computed aggregates of my entire M-PESA ledger ' +
+        '(SUMMARY.coverage from..to = full range, every transaction included) and (B) the raw newest rows for flavour. ' +
+        'Do not limit the report to the raw rows — the summary IS the whole ledger.\n' +
+        'SUMMARY: ' + JSON.stringify(aiLedgerSummary()) + '\n' +
+        'RAW NEWEST ROWS: ' + JSON.stringify(aiSnapshot(db, 80)) +
+        '\n\nProduce a UTF-8 CSV report with EXACTLY these sections in order:\n' +
+        '1) Header row: Section,Month,Category,Transactions Count,Total (KSh),Share of Spend %,Insight\n' +
+        '2) One row per category per calendar month summarized from the data (Section=Monthly)\n' +
+        '3) Total rows per month (Section=Total)\n' +
+        '4) A final overall row (Section=Overall)\n' +
+        'The Insight column gets a short practical tip (max 12 words). ' +
+        'Use plain numbers without thousands separators inside the CSV. ' +
+        'Respond with ONLY the CSV content — no commentary, no markdown fences.';
+
+      aiBtn.disabled = true;
+      aiBtn.classList.add('btn-loading');
+      if (aiLabel) aiLabel.textContent = 'Generating…';
+
+      const res = await callGemini(prompt, { temperature: 0.2, maxOutputTokens: 4096 });
+
+      aiBtn.disabled = false;
+      aiBtn.classList.remove('btn-loading');
+      if (aiLabel) aiLabel.textContent = 'Generate AI Report CSV';
+
+      if (!res.ok) {
+        toastGeminiFailure(res);
+        return;
+      }
+
+      // Strip stray markdown fences the model may add
+      let text = res.text.replace(/^```[a-z]*\s*/i, '').replace(/```\s*$/, '').trim();
+      if (!text || !/^["A-Za-z]/.test(text)) {
+        showToast('Gemini returned an unusable response. Try again.');
+        return;
+      }
+      await saveCsvEverywhere(`mpesa-ai-report-${todaySlug()}.csv`, text);
+    });
+  }
+
+  // --------------------------------------------------------
+  // FEES & FULIZA LEAKAGE AUDIT (full ledger history — v5.5)
+  // --------------------------------------------------------
+  // Full-history leakage maths: EVERY parsed "Transaction cost", Fuliza
+  // charge and airtime fee across the entire ledger, bucketed per year +
+  // month — so both the AI audit and the offline fallback cover ALL of it,
+  // not just the last 30 days.
+  function computeLeakageStats() {
+    const pad = n => String(n).padStart(2, '0');
+    let transferFees = 0, airtimeFees = 0, fulizaFees = 0, oldest = 0, newest = 0;
+    const byYear = new Map();
+    const byMonth = new Map();
+    db.forEach(t => {
+      if (t.type === 'received') return;
+      const ts = Number(t.timestamp || 0);
+      const cost = Number(t.cost || 0);
+      const isFuliza = /fuliza/i.test(t.counterparty || '') || t.type === 'fee';
+      const isAirtime = t.category === 'airtime';
+      const fulizaLeak = isFuliza ? Number(t.amount || 0) + cost : 0;
+      const airtimeLeak = (!isFuliza && isAirtime) ? cost : 0;
+      const transferLeak = (isFuliza || isAirtime) ? 0 : cost;
+      if (!transferLeak && !airtimeLeak && !fulizaLeak) return;
+      transferFees += transferLeak;
+      airtimeFees += airtimeLeak;
+      fulizaFees += fulizaLeak;
+      if (!ts) return;
+      if (!oldest || ts < oldest) oldest = ts;
+      if (ts > newest) newest = ts;
+      const d = new Date(ts);
+      const leak = transferLeak + airtimeLeak + fulizaLeak;
+      const bump = (map, k) => {
+        const o = map.get(k) || { total: 0, transfer: 0, airtime: 0, fuliza: 0 };
+        o.total += leak; o.transfer += transferLeak; o.airtime += airtimeLeak; o.fuliza += fulizaLeak;
+        map.set(k, o);
+      };
+      bump(byYear, d.getFullYear());
+      bump(byMonth, d.getFullYear() + '-' + pad(d.getMonth() + 1));
+    });
+    return {
+      transferFees, airtimeFees, fulizaFees,
+      total: transferFees + airtimeFees + fulizaFees,
+      years: [...byYear.entries()].sort((a, b) => String(b[0]).localeCompare(String(a[0]))).map(([year, o]) => ({ year, ...o })),
+      months: [...byMonth.entries()].sort().map(([month, o]) => ({ month, ...o })),
+      oldest, newest
+    };
+  }
+
+  function renderLeakageLocal(resultEl, noteHtml) {
+    const L = computeLeakageStats();
+    const yearRows = L.years.slice(0, 6).map(y =>
+      `<li><span>${y.year}</span><strong>KSh ${formatKsh(y.total)}</strong></li>`).join('');
+    resultEl.classList.add('is-open');
+    resultEl.innerHTML =
+      '<span class="ai-panel-badge ai-panel-badge--local">Local estimate · full history · works offline</span>' +
+      '<ul class="ai-panel-list">' +
+      `<li><span>Transfer &amp; Paybill costs</span><strong>KSh ${formatKsh(L.transferFees)}</strong></li>` +
+      `<li><span>Airtime purchase fees</span><strong>KSh ${formatKsh(L.airtimeFees)}</strong></li>` +
+      `<li><span>Fuliza fees &amp; interest</span><strong>KSh ${formatKsh(L.fulizaFees)}</strong></li>` +
+      '</ul>' +
+      `<p class="ai-panel-total">Total lifetime leakage: <strong>KSh ${formatKsh(L.total)}</strong></p>` +
+      (L.years.length > 1 ? '<ul class="ai-panel-list ai-panel-list--years">' + yearRows + '</ul>' : '') +
+      `<p class="ai-panel-note">Covers every fee parsed across your full history${L.oldest ? ` (${formatFriendlyDate(L.oldest)} → ${formatFriendlyDate(L.newest)})` : ''}. Fees appear only where the SMS states a transaction cost.</p>` +
+      (noteHtml || '');
+  }
+
+  function initLeakageAudit() {
+    const btn = document.getElementById('leakageBtn');
+    const label = document.getElementById('leakageLabel');
+    const resultEl = document.getElementById('leakageResult');
+    if (!btn || !resultEl) return;
+
+    btn.addEventListener('click', async () => {
+      if (!db.length) {
+        showToast('No transactions yet — sync your SMS inbox first.');
+        return;
+      }
+      // Guardrails first: offline or no key -> instant local arithmetic,
+      // the audit never hard-fails
+      if (!isOnline() || !isGeminiEnabled()) {
+        renderLeakageLocal(resultEl,
+          `<p class="ai-panel-note">${!isOnline() ? 'You are offline. ' : 'No Gemini key set. '}` +
+          'Go online with a key for the full AI breakdown &amp; savings tips.</p>');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.classList.add('btn-loading');
+      if (label) label.textContent = 'Auditing with Gemini…';
+
+      const L = computeLeakageStats();
+      const prompt =
+        'You are an M-PESA cost auditor for a Kenyan wallet ledger.\n' +
+        'These are COMPLETE fee aggregates across my ENTIRE M-PESA history (every parsed transaction cost, Fuliza charge and airtime purchase cost), already bucketed — use ONLY these numbers, estimating nothing:\n' +
+        'TOTALS_KES: ' + JSON.stringify({ transferAndPaybillCosts: L.transferFees, airtimePurchaseFees: L.airtimeFees, fulizaFeesAndInterest: L.fulizaFees, lifetimeTotal: L.total, coverageFrom: formatFriendlyDate(L.oldest), coverageTo: formatFriendlyDate(L.newest) }) + '\n' +
+        'PER_YEAR: ' + JSON.stringify(L.years) + '\n' +
+        'PER_MONTH (chronological): ' + JSON.stringify(L.months.slice(-36)) + '\n' +
+        'TASKS:\n' +
+        '1) Restate the TOTAL lifetime leakage in KES and its share vs typical M-PESA spend (one line).\n' +
+        '2) Name the most expensive year and month, and whether fees are rising or falling across recent months.\n' +
+        '3) One line on Fuliza usage share.\n' +
+        '4) End with ONE concrete saving tip including an estimated KES saving for next month.\n' +
+        'Format EXACTLY:\nTotal lifetime leakage: KES X\n• line\n• line\n• line\nTip: ...\n' +
+        'Plain natural prose only, under 100 words. Never echo raw keys, JSON or field letters.';
+
+      const res = await callGemini(prompt, { temperature: 0.15, maxOutputTokens: 2048 });
+
+      btn.disabled = false;
+      btn.classList.remove('btn-loading');
+      if (label) label.textContent = 'Audit My M-PESA Fees';
+
+      if (res.ok) {
+        resultEl.classList.add('is-open');
+        resultEl.innerHTML =
+          `<span class="ai-panel-badge ai-panel-badge--gemini">Gemini · ${escapeHtml(res.model)}</span>` +
+          `<p class="ai-panel-text">${escapeHtml(res.text).replace(/\n/g, '<br>')}</p>`;
+      } else {
+        // Graceful degradation: local arithmetic, plus an honest toast
+        renderLeakageLocal(resultEl,
+          '<p class="ai-panel-note">Gemini unreachable — computed locally from your parsed fee fields.</p>');
+        toastGeminiFailure(res);
+      }
+    });
+  }
+
+  // --------------------------------------------------------
+  // CHAT WITH YOUR WALLET (natural-language M-PESA querying)
+  // --------------------------------------------------------
+  function appendChatBubble(logEl, kind, text) {
+    const div = document.createElement('div');
+    div.className = 'chat-bubble chat-bubble--' + kind;
+    div.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+    logEl.appendChild(div);
+    while (logEl.children.length > 12) logEl.removeChild(logEl.firstChild);
+    logEl.scrollTop = logEl.scrollHeight;
+    return div;
+  }
+
+  function initWalletChat() {
+    const logEl = document.getElementById('chatLog');
+    const input = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('chatSendBtn');
+    if (!logEl || !input || !sendBtn) return;
+
+    document.querySelectorAll('.ai-chip[data-suggest]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        input.value = chip.getAttribute('data-suggest') || '';
+        input.focus();
+      });
+    });
+
+    async function ask() {
+      const question = input.value.trim();
+      if (!question) return;
+      if (!db.length) {
+        showToast('No transactions yet — sync your SMS inbox first.');
+        return;
+      }
+      if (!isGeminiEnabled()) {
+        toastGeminiFailure({ reason: 'no-key' });
+        return;
+      }
+      if (!isOnline()) {
+        toastGeminiFailure({ reason: 'offline' });
+        return;
+      }
+
+      input.value = '';
+      appendChatBubble(logEl, 'user', question);
+      // Apple-style typing indicator — three soft-pulsing dots in the AI
+      // bubble (no more spinning send icon).
+      const thinking = appendChatBubble(logEl, 'ai', '…');
+      thinking.classList.add('chat-bubble--thinking');
+      thinking.innerHTML = '<span class="chat-typing"><i></i><i></i><i></i></span>';
+      thinking.setAttribute('aria-label', 'Waiting for Gemini');
+
+      sendBtn.disabled = true;
+
+      const summary = aiLedgerSummary();
+      const prompt =
+        'You are the user’s private M-PESA wallet assistant (Kenya, currency KES).\n' +
+        'You see my ENTIRE ledger through two lenses:\n' +
+        '(A) SUMMARY — complete aggregates for every transaction from ' + (summary.coverage.from || '?') + ' to ' + (summary.coverage.to || '?') +
+        ' (' + summary.coverage.transactions + ' records): per-year & per-month sent/received/fees/Fuliza/count, spend per category per year, ' +
+        'the largest single expenses overall and this month, and counterparties — EVERY distinct counterparty as tuples ' +
+        '[name, sentTotal, receivedTotal, txCount, firstDate, lastDate]; NOTHING is omitted.\n' +
+        '(B) RECENT ROWS — the raw newest 100 transactions for day-level detail.\n' +
+        'RULES:\n' +
+        '- Person questions (e.g. "total sent to Kevin Mmbadi") come from the counterparties list: every name IS there, so NEVER say someone ' +
+        '"does not appear" — sum every name that matches and give the exact total with the period covered.\n' +
+        '- "Biggest expense" answers come from the pre-computed largest-expense lists — state the exact amount and date.\n' +
+        '- Answer any year/month/category/fee/Fuliza question from (A); never claim a covered period is empty.\n' +
+        '- Natural prose ONLY, amounts formatted "KES 1,250" — never echo raw field letters (like a:70, f:0), JSON keys or code fragments.\n' +
+        '- Compute totals exactly; stay under 100 words.\n' +
+        'SUMMARY: ' + JSON.stringify(summary) + '\n' +
+        'RECENT ROWS (newest 100, d=date&time t=type c=category p=counterparty a=amount f=fee): ' + JSON.stringify(aiSnapshot(db, 100)) + '\n' +
+        'QUESTION: ' + question;
+
+      const res = await callGemini(prompt, { temperature: 0.25, maxOutputTokens: 2048 });
+
+      sendBtn.disabled = false;
+      thinking.classList.remove('chat-bubble--thinking');
+
+      if (res.ok) {
+        thinking.innerHTML = escapeHtml(res.text).replace(/\n/g, '<br>');
+      } else {
+        // Feedback stays INSIDE the conversation — no stretched screen-wide
+        // popup — and the exact cause is still stated honestly.
+        const why = res.status ? `Google returned HTTP ${res.status}` : ({
+          'no-key': 'no Gemini key is set',
+          offline: 'you are offline',
+          timeout: 'the request timed out',
+          network: 'the connection dropped',
+          quota: "today's free quota is exhausted",
+          'model-404': 'the model lineup shifted again',
+          empty: 'Gemini sent back an empty reply'
+        }[res.reason] || 'a temporary glitch');
+        thinking.textContent = `I couldn't reach Gemini just now (${why}). Your data never left this device — ask again in a moment.`;
+        thinking.classList.add('chat-bubble--error');
+      }
+    }
+
+    sendBtn.addEventListener('click', ask);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') ask(); });
+  }
+
+  // --------------------------------------------------------
+  // AI umbrella: badge wiring + all optional features
+  // --------------------------------------------------------
+  function initAiFeatures() {
+    updateAiOfflineBadge();
+    window.addEventListener('online', updateAiOfflineBadge);
+    window.addEventListener('offline', updateAiOfflineBadge);
+    initAiExport();
+    initLeakageAudit();
+    initWalletChat();
+  }
+
+  // ========================================================
+  // PROFILE PHOTO (upload → crop circle → localStorage)
+  // ========================================================
+  let currentInitials = 'MU';
+
+  function renderAvatar() {
+    const stored = localStorage.getItem(STORAGE_KEY_PHOTO);
+    const els = [document.getElementById('avatarBtn'), document.getElementById('settingsAvatarPreview')];
+    els.forEach(el => {
+      if (!el) return;
+      if (stored) {
+        el.innerHTML = `<img src="${stored}" alt="Profile photo" />`;
+      } else {
+        el.textContent = currentInitials;
+      }
+    });
+    const removeBtn = document.getElementById('removePhotoBtn');
+    if (removeBtn) removeBtn.style.display = stored ? 'inline-flex' : 'none';
+  }
+
+  function initProfilePhoto() {
+    const photoInput = document.getElementById('photoInput');
+    const changeBtn = document.getElementById('changePhotoBtn');
+    const removeBtn = document.getElementById('removePhotoBtn');
+    const modal = document.getElementById('photoModal');
+
+    // Header avatar is display-only (v4.4): tapping it does nothing.
+    // Changing the photo is reserved for Settings > Profile Photo.
+    if (changeBtn && photoInput) {
+      changeBtn.addEventListener('click', () => photoInput.click());
+    }
+    if (removeBtn) {
+      removeBtn.addEventListener('click', () => {
+        localStorage.removeItem(STORAGE_KEY_PHOTO);
+        renderAvatar();
+        showToast('Profile photo removed.');
+      });
+    }
+
+    if (!photoInput || !modal) return;
+
+    // --- Crop session state ---
+    const viewport = document.getElementById('cropViewport');
+    const img = document.getElementById('cropImage');
+    const zoom = document.getElementById('cropZoom');
+    const saveBtn = document.getElementById('cropSaveBtn');
+    const cancelBtn = document.getElementById('cropCancelBtn');
+    const V = 240; // viewport css px (must match .crop-viewport)
+    let crop = null; // {nw, nh, base, scale, cx, cy}
+
+    function applyTransform() {
+      if (!crop) return;
+      img.style.transform = `translate(${crop.cx}px, ${crop.cy}px) scale(${crop.scale})`;
+    }
+
+    function clampPan() {
+      if (!crop) return;
+      const w = crop.nw * crop.scale;
+      const h = crop.nh * crop.scale;
+      crop.cx = Math.min(0, Math.max(V - w, crop.cx));
+      crop.cy = Math.min(0, Math.max(V - h, crop.cy));
+    }
+
+    photoInput.addEventListener('change', () => {
+      const file = photoInput.files && photoInput.files[0];
+      if (!file) return;
+      if (!/^image\//.test(file.type)) {
+        showToast('Please choose an image file.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        const probe = new Image();
+        probe.onload = () => {
+          crop = {
+            nw: probe.naturalWidth,
+            nh: probe.naturalHeight,
+            base: Math.max(V / probe.naturalWidth, V / probe.naturalHeight),
+            scale: 1, cx: 0, cy: 0
+          };
+          crop.scale = crop.base;
+          crop.cx = (V - crop.nw * crop.scale) / 2;
+          crop.cy = (V - crop.nh * crop.scale) / 2;
+          img.src = dataUrl;
+          if (zoom) zoom.value = 100;
+          applyTransform();
+          clampPan();
+          modal.classList.add('is-open');
+        };
+        probe.onerror = () => showToast('Could not read that image.');
+        probe.src = dataUrl;
+      };
+      reader.readAsDataURL(file);
+      photoInput.value = '';
+    });
+
+    // Drag to pan (pointer events cover mouse + touch)
+    let dragging = null;
+    if (viewport) {
+      viewport.addEventListener('pointerdown', e => {
+        if (!crop) return;
+        dragging = { x: e.clientX, y: e.clientY, cx: crop.cx, cy: crop.cy };
+        viewport.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      });
+      viewport.addEventListener('pointermove', e => {
+        if (!dragging || !crop) return;
+        crop.cx = dragging.cx + (e.clientX - dragging.x);
+        crop.cy = dragging.cy + (e.clientY - dragging.y);
+        clampPan();
+        applyTransform();
+      });
+      const stop = () => { dragging = null; };
+      viewport.addEventListener('pointerup', stop);
+      viewport.addEventListener('pointercancel', stop);
+    }
+
+    // Zoom slider (100% = cover viewport), anchored at viewport center
+    if (zoom) {
+      zoom.addEventListener('input', () => {
+        if (!crop) return;
+        const newScale = crop.base * (Number(zoom.value) / 100);
+        const midX = (V / 2 - crop.cx) / crop.scale; // content point at viewport center
+        const midY = (V / 2 - crop.cy) / crop.scale;
+        crop.scale = newScale;
+        crop.cx = V / 2 - midX * newScale;
+        crop.cy = V / 2 - midY * newScale;
+        clampPan();
+        applyTransform();
+      });
+    }
+
+    function closeModal() {
+      modal.classList.remove('is-open');
+      crop = null;
+      img.removeAttribute('src');
+    }
+
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
+        if (!crop) return;
+        const OUT = 256;
+        const canvas = document.createElement('canvas');
+        canvas.width = OUT;
+        canvas.height = OUT;
+        const ctx = canvas.getContext('2d');
+        const f = OUT / V;
+        ctx.beginPath();
+        ctx.arc(OUT / 2, OUT / 2, OUT / 2, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(img, crop.cx * f, crop.cy * f, crop.nw * crop.scale * f, crop.nh * crop.scale * f);
+        try {
+          const dataUrl = canvas.toDataURL('image/png');
+          localStorage.setItem(STORAGE_KEY_PHOTO, dataUrl);
+          renderAvatar();
+          showToast('Profile photo saved.');
+        } catch (e) {
+          showToast('Not enough storage to keep that photo.');
+        }
+        closeModal();
+      });
+    }
+
+    renderAvatar();
   }
 
   function showToast(msg) {
@@ -895,7 +2145,7 @@
     }[c]));
   }
 
-  // Self-test with user-provided examples
+  // Self-test with canonical Safaricom SMS formats
   function runSelfTests() {
     const test1 = 'UHK1A2B3C4 Confirmed. Ksh500.00 sent to JOHN DOE 0712345678 on 20/9/26 at 11:50 AM. New M-PESA balance is Ksh2,000.00. Transaction cost, Ksh7.00.';
     const p1 = parseMpesaMessage(test1);
@@ -916,15 +2166,19 @@
 
   // --- INITIALIZE ---
   document.addEventListener('DOMContentLoaded', () => {
-    runSelfTests();
-    loadDatabase();
-    initTheme();
-    initUser();
-    renderAllViews();
-    initTabs();
-    initSmsTab();
-    initSettingsActions();
-    initPermissionScreen();
+    // Isolated boot steps: an exception in one initializer can never
+    // silently starve the rest (v3.1.1 hardening).
+    [
+      runSelfTests, loadDatabase, initTheme, initUser, initProfilePhoto,
+      renderAllViews, initTabs, initSettingsActions, initAiFeatures,
+      initInboxSync, initPermissionScreen
+    ].forEach(fn => {
+      try {
+        fn();
+      } catch (e) {
+        console.warn('Init step failed:', fn && fn.name, e && e.message);
+      }
+    });
   });
 
 })();
